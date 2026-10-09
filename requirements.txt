@@ -1,0 +1,28 @@
+# PII Shield — Core Requirements
+# 100% Local, Privacy-Preserving PII Detection & Redaction Pipeline
+
+# Document extraction
+pymupdf>=1.23.0
+python-docx>=1.1.0
+python-pptx>=0.6.23
+pillow>=10.0.0
+opencv-python>=4.8.0
+pytesseract>=0.3.10
+lxml>=4.9.0
+
+# Detection & NER
+presidio-analyzer>=2.2.0
+spacy>=3.7.0
+# Note: install spacy model locally: python -m spacy download en_core_web_lg
+
+# Synthetic data generation
+faker>=20.0.0
+reportlab>=4.0.0
+
+# User Interface & Data handling
+gradio>=4.0.0
+pandas>=2.0.0
+pyyaml>=6.0.0
+
+# Testing & Verification
+pytest>=7.4.0

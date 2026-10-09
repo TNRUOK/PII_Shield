@@ -1,0 +1,119 @@
+{
+  "document": "scanned_policy.pdf",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Allison Hill",
+      "location": "metadata/author",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Allison Hill",
+      "location": "page:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "compliance@cadencefinancial.com",
+      "location": "page:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Noah Rhodes",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-46048",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "SSN",
+      "text": "655-15-0410",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "lrobinson@example.com",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "361-855-9407",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "IP_ADDRESS",
+      "text": "10.63.58.36",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "ANGIE HENDERSON",
+      "location": "page:3",
+      "tricky": true
+    },
+    {
+      "type": "EMAIL",
+      "text": "blakeerik@example.com",
+      "location": "page:3",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "584-695-9310",
+      "location": "page:3",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Daniel Wagner",
+      "location": "page:4",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-0987654321",
+      "location": "page:4",
+      "tricky": true
+    },
+    {
+      "type": "EMAIL",
+      "text": "joshua35@example.org",
+      "location": "page:4",
+      "tricky": false
+    },
+    {
+      "type": "AADHAAR",
+      "text": "1819 6001 3380",
+      "location": "page:5",
+      "tricky": true
+    },
+    {
+      "type": "PERSON",
+      "text": "Cristian Santos",
+      "location": "page:5",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "731-564-7525",
+      "location": "page:5",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Noah Rhodes",
+      "location": "page:6",
+      "tricky": false
+    }
+  ]
+}

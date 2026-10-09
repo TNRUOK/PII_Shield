@@ -1,0 +1,53 @@
+# PII Shield — Central Configuration
+# All thresholds, entity types, and profile settings live here.
+
+# Active profile: "strict" or "balanced"
+active_profile: balanced
+
+profiles:
+  strict:
+    ocr_min_confidence: 60      # reject OCR results below this mean word-confidence
+    ner_confidence_threshold: 0.7
+    rule_confidence_threshold: 0.8
+  balanced:
+    ocr_min_confidence: 40
+    ner_confidence_threshold: 0.5
+    rule_confidence_threshold: 0.6
+
+# Entity types to detect. Comment out lines to disable.
+enabled_entities:
+  - EMAIL
+  - PHONE
+  - SSN
+  - CREDIT_CARD
+  - IBAN
+  - PASSPORT
+  - AADHAAR
+  - PAN
+  - EMPLOYEE_ID
+  - ACCOUNT_NUMBER
+  - DATE_OF_BIRTH
+  - GOVERNMENT_ID
+  - IP_ADDRESS
+  - PERSON
+  # - LOCATION   # off by default — high false-positive rate on city/company names
+
+context:
+  table_header_boost: 1.2        # multiply confidence of hits under matching column headers
+  labelled_name_confidence: 0.85 # confidence for Prepared-by / Author: / Owner: patterns
+  unlabelled_name_col_confidence: 0.60  # unlabelled caps strings in a "Name" column
+
+sensitivity_map:
+  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN]
+  Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, DATE_OF_BIRTH, PERSON]
+  Low:    [IP_ADDRESS, GOVERNMENT_ID]
+
+redaction:
+  placeholder_format: "[{type}_{n}]"   # e.g. [PERSON_1], [EMAIL_2]
+
+output:
+  report_dir: reports/                 # relative to cwd when running the pipeline
+  mapping_suffix: _mapping.json        # appended to input filename (never in reports)
+
+# Minimum meaningful text chars on a PDF page (below → try OCR)
+pdf_native_min_chars: 50

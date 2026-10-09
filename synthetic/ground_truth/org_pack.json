@@ -1,0 +1,281 @@
+{
+  "document": "org_pack.pptx",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Heather Bolton",
+      "location": "metadata/author",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "William Gould",
+      "location": "metadata/last_modified_by",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Mark Cox",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "erikarush@example.com",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "494.973.1217",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Meghan Cisneros",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "khines@example.org",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "455-718-8442",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Lawrence Harrington",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "raymond43@example.org",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "431.332.3705x89578",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Austin Osborne",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "fitzgeraldvictor@example.com",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "446-778-6691",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "James Bradley",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "greenjorge@example.com",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "+1-217-378-5289x2268",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Courtney Meza",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Diane Miller",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Tyler Hill",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Elizabeth Martin",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Diane Miller",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Tyler Hill",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Elizabeth Martin",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Courtney Meza",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Tyler Hill",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Elizabeth Martin",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Courtney Meza",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Diane Miller",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Elizabeth Martin",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Courtney Meza",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Diane Miller",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Tyler Hill",
+      "location": "slide:3/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Lisa Davis",
+      "location": "slide:4",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Leslie Carpenter",
+      "location": "slide:4",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Marcus Winters",
+      "location": "slide:4",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Thomas Williams",
+      "location": "slide:4",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Angela Fry",
+      "location": "slide:4",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Deborah Clark",
+      "location": "slide:6/image",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "bmontgomery@example.com",
+      "location": "slide:6/image",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Kimberly May",
+      "location": "slide:7",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "timothy64@example.com",
+      "location": "slide:7",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "402-776-7735",
+      "location": "slide:7",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Emma Travis",
+      "location": "slide:7/notes",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "theresa25@example.net",
+      "location": "slide:7/notes",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "compliance@cadencefinancial.com",
+      "location": "slide:8",
+      "tricky": false
+    }
+  ]
+}

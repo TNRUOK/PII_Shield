@@ -1,0 +1,35 @@
+Cadence Financial Services
+Organisational Pack — Confidential
+Directory of Role Holders
+Mark Cox | Chief Executive Officer | erikarush@example.com | 494.973.1217
+Meghan Cisneros | Chief Risk Officer | khines@example.org | 455-718-8442
+Lawrence Harrington | Head of Compliance | raymond43@example.org | 431.332.3705x89578
+Austin Osborne | VP Engineering | fitzgeraldvictor@example.com | 446-778-6691
+James Bradley | HR Director | greenjorge@example.com | +1-217-378-5289x2268
+RACI Matrix
+Risk Assessment | Courtney Meza | Diane Miller | Tyler Hill | Elizabeth Martin
+Policy Review | Diane Miller | Tyler Hill | Elizabeth Martin | Courtney Meza
+Audit Report | Tyler Hill | Elizabeth Martin | Courtney Meza | Diane Miller
+System Access | Elizabeth Martin | Courtney Meza | Diane Miller | Tyler Hill
+Organisation Chart
+Lisa Davis
+CEO
+Leslie Carpenter
+CRO
+Marcus Winters
+CFO
+Thomas Williams
+Head of IT
+Angela Fry
+Head of HR
+Data Protection Policy
+All employees must comply with the data protection framework. Violations are subject to disciplinary action. Refer to the Employee Handbook for full details.
+User: Deborah Clark
+Email: bmontgomery@example.com
+Access Level: Admin
+Owner: Kimberly May
+Email: timothy64@example.com
+Phone: 402-776-7735
+Presenter: Emma Travis (theresa25@example.net). Remind attendees that all data is confidential.
+Summary
+compliance@cadencefinancial.com

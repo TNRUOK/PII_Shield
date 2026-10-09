@@ -1,0 +1,185 @@
+{
+  "document": "training_guide.docx",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Mia Sutton",
+      "location": "metadata/author",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Mark Ferguson",
+      "location": "metadata/last_modified_by",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Marie Kim DDS",
+      "location": "header",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Joel Nelson",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "gabriellecameron@example.org",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "505.964.1395",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-13478",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Thomas Ellis",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "donald88@example.com",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "001-496-496-5328x7101",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-83563",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Jennifer Brown",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "dcarlson@example.net",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "280-618-4514x627",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-36062",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Pamela Romero",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "harrellkenneth@example.net",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "793.625.2880x95701",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-95181",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "David Bradley",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "millertodd@example.org",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "001-682-827-8248x96383",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-81426",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "William Hoover",
+      "location": "body",
+      "tricky": true
+    },
+    {
+      "type": "SSN",
+      "text": "430-29-7360",
+      "location": "body",
+      "tricky": false
+    },
+    {
+      "type": "PAN",
+      "text": "ABCDE5557F",
+      "location": "body",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Danny Morgan",
+      "location": "footnote:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "briannasmith@example.net",
+      "location": "footnote:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Lance Simmons",
+      "location": "image:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "cbell@example.net",
+      "location": "image:1",
+      "tricky": false
+    }
+  ]
+}
