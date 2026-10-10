@@ -1,0 +1,89 @@
+{
+  "document": "training_guide.docx",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Chad Sullivan",
+      "location": "metadata/author",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Chad Sullivan",
+      "location": "first_page_header",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "TJ Harlan",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Valerie Bowman",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Joshua Bryan",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "PQ Lindqvist",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Todd Alvarez",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Parker Higgins",
+      "location": "table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Brittany Pugh",
+      "location": "textbox:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "davisdouglas@example.org",
+      "location": "textbox:1",
+      "tricky": false
+    },
+    {
+      "type": "SSN",
+      "text": "137-98-1419",
+      "location": "tracked_change:deleted/1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Jennifer Glass DVM",
+      "location": "table:2",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Jonathan Young",
+      "location": "table:2/nested:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "815-821-8409x053",
+      "location": "table:2/nested:1",
+      "tricky": false
+    }
+  ]
+}

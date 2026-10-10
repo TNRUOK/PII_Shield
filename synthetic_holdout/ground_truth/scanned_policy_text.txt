@@ -1,0 +1,31 @@
+VANGUARD LOGISTICS CORP
+GLOBAL SUPPLY CHAIN SECURITY POLICY
+Author: Curtis White
+Version 4.0  |  Effective: 2025-03-01
+
+Confidential document. Unauthorized distribution prohibited.
+Inquiries: security@vanguard-logistics.com
+SECTION 2: PERSONNEL CREDENTIALS
+
+Employee Name: Peter King
+Employee ID: EMP-88569
+Social Security: 414-49-3279
+Email: lynn32@example.com
+Telephone: +1-506-935-8178
+Workstation IP: 10.46.59.64
+
+Fleet tracking authorization is granted under ISO-27001.
+SECTION 3: REGIONAL DIRECTORS
+
+Operations Director: Michael Ryan
+Direct Phone: 4522327928
+Email: melissamorgan@example.net
+
+Terminal coordinates and manifest routing are monitored 24/7.
+SECTION 4: COMPLIANCE SIGN-OFF
+
+Reviewer: Katherine Fisher
+Contact: harrisonrichard@example.com
+Mobile: 602-276-1612
+
+Final Approval by Document Owner: Claire Winters

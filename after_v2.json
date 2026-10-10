@@ -1,0 +1,89 @@
+{
+  "entity_metrics": {
+    "AADHAAR": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "EMAIL": {
+      "tp": 17,
+      "fp": 1,
+      "fn": 3,
+      "precision": 0.9444,
+      "recall": 0.85,
+      "f1": 0.8947
+    },
+    "EMPLOYEE_ID": {
+      "tp": 6,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.8571,
+      "recall": 0.8571,
+      "f1": 0.8571
+    },
+    "GOVERNMENT_ID": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "IP_ADDRESS": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "PAN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PERSON": {
+      "tp": 48,
+      "fp": 4,
+      "fn": 1,
+      "precision": 0.9231,
+      "recall": 0.9796,
+      "f1": 0.9505
+    },
+    "PHONE": {
+      "tp": 13,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.9286,
+      "f1": 0.963
+    },
+    "SSN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6667
+    },
+    "OVERALL": {
+      "tp": 87,
+      "fp": 8,
+      "fn": 8,
+      "precision": 0.9158,
+      "recall": 0.9158,
+      "f1": 0.9158
+    }
+  },
+  "structure_retention": {
+    "org_pack.pptx": 0.8978,
+    "scanned_policy.pdf": 0.9598,
+    "training_guide.docx": 0.9887
+  }
+}

@@ -7,6 +7,7 @@ ground truth, verifies zero leakage, and prints evaluation metrics.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import sys
@@ -30,33 +31,36 @@ log = logging.getLogger("evaluate")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 ROOT = Path(__file__).resolve().parent
-SYNTHETIC_DIR = ROOT / "synthetic"
-GT_DIR = SYNTHETIC_DIR / "ground_truth"
 
 
 def main():
+    parser = argparse.ArgumentParser(description="PII Shield Evaluation")
+    parser.add_argument("--input", default="synthetic", help="Input directory containing documents and ground_truth/")
+    parser.add_argument("--baseline", default=None, help="Path to baseline json file for comparison")
+    parser.add_argument("--output", default="evaluation_results.json", help="Path to save evaluation results json")
+    args = parser.parse_args()
+
+    input_dir = Path(args.input)
+    if not input_dir.is_absolute():
+        input_dir = ROOT / input_dir
+    gt_dir = input_dir / "ground_truth"
+
     print("=" * 70)
-    print("PII SHIELD — COMPREHENSIVE PIPELINE EVALUATION")
+    print(f"PII SHIELD — COMPREHENSIVE PIPELINE EVALUATION ({input_dir.name})")
     print("=" * 70)
 
     with open(ROOT / "config.yaml", "r", encoding="utf-8") as fh:
         config = yaml.safe_load(fh)
 
-    doc_files = [
-        SYNTHETIC_DIR / "training_guide.docx",
-        SYNTHETIC_DIR / "org_pack.pptx",
-        SYNTHETIC_DIR / "scanned_policy.pdf",
-    ]
+    doc_files = sorted(
+        [p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() in (".docx", ".pptx", ".pdf")]
+    )
 
     all_predicted_entities: List[Dict] = []
     extracted_texts: Dict[str, str] = {}
     file_summaries = []
 
     for doc_path in doc_files:
-        if not doc_path.exists():
-            print(f"Skipping {doc_path.name} (not found)")
-            continue
-
         print(f"\nProcessing: {doc_path.name}...")
         chunks = route(str(doc_path), config)
 
@@ -76,7 +80,7 @@ def main():
         mapping = PlaceholderMapping(source_file=str(doc_path), output_dir=str(out_dir))
         redacted = redact_chunks(chunks, entities, mapping, config)
 
-        # Leakage check
+        # Leakage check with known-value propagation
         leak_res = check_leakage(redacted, config, known_values=mapping)
 
         # File summary
@@ -110,12 +114,37 @@ def main():
     print("\n" + "=" * 70)
     print("BENCHMARK METRICS (VS GROUND TRUTH)")
     print("=" * 70)
-    eval_results = run_evaluation(str(GT_DIR), all_predicted_entities, extracted_texts)
+    eval_results = run_evaluation(str(gt_dir), all_predicted_entities, extracted_texts)
 
-    eval_out = ROOT / "evaluation_results.json"
+    eval_out = Path(args.output)
+    if not eval_out.is_absolute():
+        eval_out = ROOT / eval_out
     with open(eval_out, "w", encoding="utf-8") as fh:
         json.dump(eval_results, fh, indent=2)
     print(f"\nSaved evaluation metrics to {eval_out}")
+
+    # Baseline comparison if provided
+    if args.baseline:
+        b_path = Path(args.baseline)
+        if not b_path.is_absolute():
+            b_path = ROOT / b_path
+        if b_path.exists():
+            with open(b_path, "r", encoding="utf-8") as fh:
+                baseline_data = json.load(fh)
+            print("\n" + "=" * 70)
+            print("COMPARISON VS BASELINE")
+            print("=" * 70)
+            b_overall = baseline_data.get("entity_metrics", {}).get("OVERALL", {})
+            c_overall = eval_results.get("entity_metrics", {}).get("OVERALL", {})
+            b_rec = b_overall.get("recall", 0.0)
+            c_rec = c_overall.get("recall", 0.0)
+            b_prec = b_overall.get("precision", 0.0)
+            c_prec = c_overall.get("precision", 0.0)
+            b_f1 = b_overall.get("f1", 0.0)
+            c_f1 = c_overall.get("f1", 0.0)
+            print(f"Overall Recall   : {b_rec:.4f} → {c_rec:.4f} ({c_rec - b_rec:+.4f})")
+            print(f"Overall Precision: {b_prec:.4f} → {c_prec:.4f} ({c_prec - b_prec:+.4f})")
+            print(f"Overall F1       : {b_f1:.4f} → {c_f1:.4f} ({c_f1 - b_f1:+.4f})")
 
 
 if __name__ == "__main__":

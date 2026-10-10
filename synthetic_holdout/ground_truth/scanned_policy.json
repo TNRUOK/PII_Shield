@@ -1,0 +1,101 @@
+{
+  "document": "scanned_policy.pdf",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Curtis White",
+      "location": "metadata/author",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Curtis White",
+      "location": "page:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "security@vanguard-logistics.com",
+      "location": "page:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Peter King",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-88569",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "SSN",
+      "text": "414-49-3279",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "lynn32@example.com",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "+1-506-935-8178",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "IP_ADDRESS",
+      "text": "10.46.59.64",
+      "location": "page:2",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Michael Ryan",
+      "location": "page:3",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "4522327928",
+      "location": "page:3",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "melissamorgan@example.net",
+      "location": "page:3",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Katherine Fisher",
+      "location": "page:4",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "harrisonrichard@example.com",
+      "location": "page:4",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "602-276-1612",
+      "location": "page:4",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Claire Winters",
+      "location": "page:4",
+      "tricky": false
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "document": "org_pack.pptx",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Robert Jones",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "hudsonamanda@example.net",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "8952642290",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Jorge Peters",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "eric70@example.net",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "001-463-731-7244x51838",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Robin Miller",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "EMAIL",
+      "text": "hardymandy@example.org",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PHONE",
+      "text": "+1-410-786-2539",
+      "location": "slide:2/table:1",
+      "tricky": false
+    },
+    {
+      "type": "PERSON",
+      "text": "Stephanie Pacheco",
+      "location": "slide:2/notes",
+      "tricky": false
+    }
+  ]
+}
