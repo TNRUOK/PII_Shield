@@ -66,14 +66,6 @@ def match_entities(
                 matched = True
                 break
 
-            import re as _re
-            clean_gt = _re.sub(r"\W+", "", gt_text)
-            clean_pred = _re.sub(r"\W+", "", pred_text)
-            if clean_gt and clean_pred and (clean_gt in clean_pred or clean_pred in clean_gt or clean_gt == clean_pred):
-                tps.append({"pred": pred, "gt": gt})
-                gt_remaining.pop(i)
-                matched = True
-                break
 
         if not matched:
             fps.append(pred)
