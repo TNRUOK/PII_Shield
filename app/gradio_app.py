@@ -149,7 +149,7 @@ def process_files(
         all_redacted.append(f"=== {fname} ===\n" + _chunks_to_text(redacted))
 
         # --- Leakage check ---
-        leak = check_leakage(redacted, config)
+        leak = check_leakage(redacted, config, known_values=mapping)
 
         # --- File summary ---
         summary = build_file_summary(file_path, chunks, file_entities, leak, None)

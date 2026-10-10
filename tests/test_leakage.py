@@ -169,3 +169,90 @@ def test_all_blocked_chunks_return_zero_leaks(config):
     assert result.downstream_safe is True
     assert len(result.leaks) == 0
 
+
+def test_partially_redacted_ssn_flagged(config):
+    """A chunk with a partially-redacted SSN must be flagged as unsafe."""
+    chunk = Chunk(
+        file="ssn_leak.txt",
+        location="page:1",
+        text="Participant record: SSN was partially hidden 219-45-[SSN_1] in error.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config, known_values=["219-45-6789"])
+    assert result.downstream_safe is False
+    assert len(result.leaks) > 0
+    types = [e.entity_type for e in result.leaks]
+    assert "SSN" in types
+
+
+def test_partially_redacted_ssn_without_known_values(config):
+    """Partially redacted SSN like 219-45-XXXX is caught by independent regex."""
+    chunk = Chunk(
+        file="ssn_leak2.txt",
+        location="page:1",
+        text="Participant SSN was 219-45-XXXX on file.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert len(result.leaks) > 0
+    assert any(e.entity_type in ("SSN", "GOVERNMENT_ID") for e in result.leaks)
+
+
+def test_known_value_propagation(config):
+    """Known values from mapping file are flagged if they appear in redacted text (even lowercase)."""
+    chunk = Chunk(
+        file="name_leak.txt",
+        location="page:1",
+        text="Author was noted as emily watson in the appendix.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    # Passed with different casing
+    result = check_leakage([chunk], config, known_values=["Emily Watson"])
+    assert result.downstream_safe is False
+    assert len(result.leaks) > 0
+    # Residue must contain masked version
+    assert any("E**********n" in r or "e**********n" in r for r in result.residue)
+
+
+def test_unverified_residue_reporting(config):
+    """Initials or long digit runs outside placeholders are captured in unverified residue."""
+    chunk = Chunk(
+        file="residue_doc.txt",
+        location="page:1",
+        text="The system batch 887766554433 was processed with PQ Lindqvist in sector 4.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert len(result.unverified_residue) > 0
+    assert len(result.residue) > 0
+    # Masked values only: no raw numbers or full name
+    assert "9988776655" not in result.residue
+
+
+def test_residue_reporting_masks_all_values(config):
+    """All reported residues must be masked, zero raw PII in residue list."""
+    chunk = Chunk(
+        file="raw_check.txt",
+        location="page:1",
+        text="Leak here: secret.agent@cadence-corp.com and 219-45-6789.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    for res_str in result.residue:
+        assert "secret.agent@cadence-corp.com" not in res_str
+        assert "219-45-6789" not in res_str
+        assert "*" in res_str
+
+

@@ -77,7 +77,7 @@ def main():
         redacted = redact_chunks(chunks, entities, mapping, config)
 
         # Leakage check
-        leak_res = check_leakage(redacted, config)
+        leak_res = check_leakage(redacted, config, known_values=mapping)
 
         # File summary
         summary = build_file_summary(

@@ -192,7 +192,7 @@ def redact_text_endpoint(req: RedactTextRequest):
     session_store.update(mapping._placeholder_to_raw)
 
     # 3. Leakage safety verification
-    leak_res = check_leakage(redacted_chunks, config)
+    leak_res = check_leakage(redacted_chunks, config, known_values=mapping)
 
     # Return masked entity list (safe for UI)
     pii_summary = [
@@ -285,7 +285,7 @@ def redact_file_endpoint(
     redacted_chunks = redact_chunks(chunks, all_entities, mapping, config)
     session_store.update(mapping._placeholder_to_raw)
 
-    leak_res = check_leakage(redacted_chunks, config)
+    leak_res = check_leakage(redacted_chunks, config, known_values=mapping)
 
     # Format text
     clean_lines = []
