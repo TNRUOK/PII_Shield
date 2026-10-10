@@ -217,7 +217,7 @@ or double-click `run_extension_bridge.bat`. The bridge listens securely on `http
 1. Open your browser and navigate to `chrome://extensions` (or `edge://extensions`).
 2. Toggle on **Developer mode** (top right switch).
 3. Click **"Load unpacked"**.
-4. Select the folder: `c:\D Drive\OCR\pii_shield\extension`.
+4. Select the folder: `extension`.
 
 ### 3. Usage on ChatGPT / Claude / Gemini
 - **In-Place Shielding**: When typing into any prompt box on ChatGPT, Claude, or Gemini, click the floating **"🛡️ Shield PII"** button or press **`Ctrl+Shift+S`**. PII is replaced instantly with tokens (`[PERSON_1]`, `[EMAIL_1]`).
