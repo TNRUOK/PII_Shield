@@ -26,18 +26,25 @@ log = logging.getLogger(__name__)
 
 # Auto-detect Tesseract executable on Windows if not on PATH
 def _setup_tesseract_cmd() -> None:
-    if shutil.which("tesseract"):
-        return
     candidates = [
+        os.path.expanduser(r"~\scoop\apps\tesseract\current\tesseract.exe"),
+        os.path.expanduser(r"~\scoop\shims\tesseract.exe"),
         r"C:\Program Files\Tesseract-OCR\tesseract.exe",
         r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
     ]
-    for c in candidates:
-        if Path(c).is_file():
-            pytesseract.pytesseract.tesseract_cmd = c
-            log.info("Configured Tesseract binary at %s", c)
-            return
+    if not shutil.which("tesseract"):
+        for c in candidates:
+            if Path(c).is_file():
+                pytesseract.pytesseract.tesseract_cmd = str(Path(c).resolve())
+                log.info("Configured Tesseract binary at %s", c)
+                break
+
+    # Ensure TESSDATA_PREFIX is set if tessdata is in scoop location
+    if "TESSDATA_PREFIX" not in os.environ:
+        scoop_tessdata = os.path.expanduser(r"~\scoop\apps\tesseract\current\tessdata")
+        if Path(scoop_tessdata).is_dir():
+            os.environ["TESSDATA_PREFIX"] = scoop_tessdata
 
 _setup_tesseract_cmd()
 
@@ -108,25 +115,16 @@ def preprocess(img: Image.Image) -> np.ndarray:
     binary numpy array ready for Tesseract.
 
     Steps:
-      1. Convert to grayscale
-      2. Deskew
-      3. Fast non-local means denoising
-      4. Adaptive (Gaussian) thresholding
+      1. Upsample if low resolution (<1800px)
+      2. Convert to grayscale
+      3. Deskew
+      4. Otsu binarization (preserves stroke fidelity and punctuation better than adaptive)
     """
-    # Upsample before any processing so Tesseract sees ≥300 dpi equivalent
     img = _upsample_if_small(img, min_dim=1800)
     arr = pil_to_cv2(img)
     gray = cv2.cvtColor(arr, cv2.COLOR_BGR2GRAY)
     gray = _deskew(gray)
-    # Denoise — conservative parameters to avoid blurring thin strokes
-    denoised = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
-    # Adaptive threshold — larger blockSize handles uneven lighting on low-DPI scans better
-    binary = cv2.adaptiveThreshold(
-        denoised, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        blockSize=31, C=5,
-    )
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return binary
 
 
