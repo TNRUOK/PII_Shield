@@ -418,50 +418,71 @@ window.addEventListener("keydown", (e) => {
 function scanForPlaceholdersToRestore() {
   if (!activeSessionId) return;
 
-  const elements = document.querySelectorAll("p, li, pre, code");
+  const candidateSelector = "p, li, pre, code";
+  const elements = document.querySelectorAll(candidateSelector);
+
   elements.forEach((el) => {
+    // Skip if already checked or inside an element already checked
+    if (el.dataset.piiChecked === "true" || el.closest('[data-pii-checked="true"]')) return;
     if (el.querySelector(".pii-restore-pill")) return;
-    if (el.dataset.piiChecked === "true") return;
 
-    if (/\[[A-Z_]+_\d+\]/.test(el.textContent)) {
-      el.dataset.piiChecked = "true";
-
-      const badge = document.createElement("button");
-      badge.className = "pii-restore-pill";
-      badge.type = "button";
-      badge.title = "Click to restore original values locally";
-      badge.textContent = "🔓 Restore PII";
-
-      badge.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        badge.textContent = "⏳ Restoring...";
-        badge.disabled = true;
-
-        try {
-          const clone = el.cloneNode(true);
-          const pill = clone.querySelector(".pii-restore-pill");
-          if (pill) pill.remove();
-          const targetText = clone.innerText || clone.textContent;
-
-          const data = await sendBridgeMessage({
-            type: "RESTORE_TEXT",
-            text: targetText,
-            sessionId: activeSessionId,
-          });
-
-          el.innerText = data.restored_text;
-          showToast("✅ Restored original values locally!", true);
-        } catch (err) {
-          badge.textContent = "🔓 Restore PII";
-          badge.disabled = false;
-          showToast("Could not restore: " + err.message, false);
-        }
-      });
-
-      el.appendChild(badge);
+    // Skip user message input containers, widgets, and file upload previews
+    if (
+      el.closest(
+        "#pii-shield-widget, textarea, input, [contenteditable='true'], #prompt-textarea, [role='textbox'], .file-preview, [data-testid*='upload'], [class*='upload'], [class*='attachment']"
+      )
+    ) {
+      return;
     }
+
+    const placeholderRegex = /\[[A-Z_]+_\d+\]/;
+    if (!placeholderRegex.test(el.textContent)) return;
+
+    // Target innermost elements only: skip if any child candidate element also matches
+    const matchingChild = Array.from(el.querySelectorAll(candidateSelector)).some((child) =>
+      placeholderRegex.test(child.textContent)
+    );
+    if (matchingChild) return;
+
+    el.dataset.piiChecked = "true";
+
+    const badge = document.createElement("button");
+    badge.className = "pii-restore-pill";
+    badge.type = "button";
+    badge.title = "Click to restore original values locally";
+    badge.setAttribute("aria-hidden", "true");
+    badge.setAttribute("tabindex", "-1");
+    // Text is rendered via CSS ::after so reading el.innerText / textContent never copies the button label
+
+    badge.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      badge.dataset.status = "loading";
+      badge.disabled = true;
+
+      try {
+        const clone = el.cloneNode(true);
+        const pill = clone.querySelector(".pii-restore-pill");
+        if (pill) pill.remove();
+        const targetText = clone.innerText || clone.textContent;
+
+        const data = await sendBridgeMessage({
+          type: "RESTORE_TEXT",
+          text: targetText,
+          sessionId: activeSessionId,
+        });
+
+        el.innerText = data.restored_text;
+        showToast("✅ Restored original values locally!", true);
+      } catch (err) {
+        delete badge.dataset.status;
+        badge.disabled = false;
+        showToast("Could not restore: " + err.message, false);
+      }
+    });
+
+    el.appendChild(badge);
   });
 }
 

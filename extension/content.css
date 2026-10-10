@@ -101,6 +101,16 @@
   user-select: none;
 }
 
+.pii-restore-pill::after {
+  content: "🔓 Restore PII";
+  user-select: none;
+  pointer-events: none;
+}
+
+.pii-restore-pill[data-status="loading"]::after {
+  content: "⏳ Restoring...";
+}
+
 .pii-restore-pill:hover {
   background: rgba(16, 185, 129, 0.3);
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
