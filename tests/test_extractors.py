@@ -66,6 +66,23 @@ class TestPDFExtractor:
         indices = [c.order_index for c in pdf_chunks]
         assert indices == sorted(indices), "order_index should be monotonically increasing"
 
+    def test_pdf_ocr_caching(self, synthetic_dir, config):
+        """Second extraction of a PDF must hit the sha1 page cache."""
+        from extract.pdf import extract_pdf, clear_pdf_cache, get_pdf_cache_size
+
+        pdf = synthetic_dir / "scanned_policy.pdf"
+        if not pdf.exists():
+            pytest.skip("scanned_policy.pdf not found")
+
+        clear_pdf_cache()
+        c1 = extract_pdf(str(pdf), config)
+        cache_size_after_first = get_pdf_cache_size()
+        assert cache_size_after_first > 0, "Pages should be cached"
+
+        c2 = extract_pdf(str(pdf), config)
+        assert len(c1) == len(c2)
+        assert [c.text for c in c1] == [c.text for c in c2]
+
 
 class TestDOCXExtractor:
     def test_returns_chunks(self, docx_chunks):

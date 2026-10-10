@@ -248,6 +248,17 @@ def ocr_image(
     return best_text, best_conf
 
 
+_OCR_BYTES_CACHE: Dict[str, Tuple[str, float]] = {}
+
+
+def get_ocr_cache_size() -> int:
+    return len(_OCR_BYTES_CACHE)
+
+
+def clear_ocr_cache() -> None:
+    _OCR_BYTES_CACHE.clear()
+
+
 def ocr_bytes(
     raw_bytes: bytes,
     fmt: str = "PNG",
@@ -257,11 +268,18 @@ def ocr_bytes(
 ) -> Tuple[str, float]:
     """
     Convenience wrapper: accepts raw image bytes, returns (text, mean_confidence).
-    Used by docx.py and pptx.py to OCR embedded images.
+    Used by docx.py and pptx.py to OCR embedded images, with sha1 caching.
     """
+    import hashlib
+    sha1 = hashlib.sha1(raw_bytes).hexdigest()
+    if sha1 in _OCR_BYTES_CACHE:
+        return _OCR_BYTES_CACHE[sha1]
+
     try:
         img = Image.open(io.BytesIO(raw_bytes))
     except Exception as exc:
         log.error("Cannot open image bytes: %s", exc)
         return "", 0.0
-    return ocr_image(img, lang=lang, min_confidence=min_confidence, config=config)
+    res = ocr_image(img, lang=lang, min_confidence=min_confidence, config=config)
+    _OCR_BYTES_CACHE[sha1] = res
+    return res

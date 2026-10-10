@@ -9,12 +9,16 @@ Strategy per page:
   3. If OCR confidence < config.ocr_min_confidence: emit BLOCKED chunk.
 
 Also extracts PDF metadata (author, title, subject) as Chunk(location="metadata").
+Supports parallelized OCR via ProcessPoolExecutor and in-memory SHA1 page caching.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 import fitz  # PyMuPDF
 from PIL import Image
@@ -28,13 +32,51 @@ log = logging.getLogger(__name__)
 OCR_RENDER_DPI = 300
 _INCH_TO_PT = 72  # PyMuPDF uses points; 1 inch = 72 pt → scale = DPI/72
 
+# In-memory SHA1 page cache
+_PDF_PAGE_CACHE: Dict[str, Tuple[str, float]] = {}
 
-def _render_page(page: fitz.Page, dpi: int = OCR_RENDER_DPI) -> Image.Image:
-    """Render a PDF page to a PIL Image at the given DPI."""
+
+def get_pdf_cache_size() -> int:
+    """Return the number of cached OCR pages."""
+    return len(_PDF_PAGE_CACHE)
+
+
+def clear_pdf_cache() -> None:
+    """Clear the in-memory OCR page cache."""
+    _PDF_PAGE_CACHE.clear()
+
+
+def _render_page(page: fitz.Page, dpi: int = OCR_RENDER_DPI) -> Tuple[Image.Image, str]:
+    """Render a PDF page to a PIL Image at given DPI and compute its sha1 hash."""
     zoom = dpi / 72
     mat = fitz.Matrix(zoom, zoom)
     pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB, alpha=False)
-    return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    sha1 = hashlib.sha1(pix.samples).hexdigest()
+    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    return img, sha1
+
+
+def _ocr_page_worker(args: tuple) -> tuple[int, str, float, str, Optional[str]]:
+    """Worker function for parallel OCR execution across multiple worker processes."""
+    file_path, page_num, ocr_min_conf, config, dpi = args
+    os.environ["OMP_THREAD_LIMIT"] = "1"
+    try:
+        import fitz
+        from PIL import Image
+        import hashlib
+        from extract.ocr import ocr_image
+        doc = fitz.open(file_path)
+        page = doc[page_num]
+        zoom = dpi / 72
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB, alpha=False)
+        sha1 = hashlib.sha1(pix.samples).hexdigest()
+        pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        doc.close()
+        ocr_text, mean_conf = ocr_image(pil_img, min_confidence=ocr_min_conf, config=config)
+        return page_num, ocr_text, mean_conf, sha1, None
+    except Exception as exc:
+        return page_num, "", 0.0, "", str(exc)
 
 
 def _metadata_chunks(doc: fitz.Document, file: str, order_start: int) -> List[Chunk]:
@@ -64,7 +106,7 @@ def _metadata_chunks(doc: fitz.Document, file: str, order_start: int) -> List[Ch
 
 def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
     """
-    Extract all text chunks from a PDF file.
+    Extract all text chunks from a PDF file with parallel OCR and SHA1 caching.
 
     Parameters
     ----------
@@ -103,36 +145,74 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
     chunks.extend(meta_chunks)
     order += len(meta_chunks)
 
-    # --- Pages ---
+    # First pass: check native text layer and check sha1 cache
+    native_pages: Dict[int, str] = {}
+    pages_to_ocr: List[int] = []
+    cached_ocr_results: Dict[int, Tuple[str, float]] = {}
+
     for page_num in range(len(doc)):
         page = doc[page_num]
-        location = f"page:{page_num + 1}"
-
-        # Try native text layer first
         native_text = page.get_text("text").strip()
-
         if len(native_text) >= min_chars:
-            # Good native text layer
+            native_pages[page_num] = native_text
+        else:
+            # Check sha1 cache
+            zoom = OCR_RENDER_DPI / 72
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB, alpha=False)
+            sha1 = hashlib.sha1(pix.samples).hexdigest()
+            if sha1 in _PDF_PAGE_CACHE:
+                cached_ocr_results[page_num] = _PDF_PAGE_CACHE[sha1]
+            else:
+                pages_to_ocr.append(page_num)
+
+    doc.close()
+
+    # Second pass: parallel OCR for uncached pages
+    ocr_results: Dict[int, Tuple[str, float, Optional[str]]] = {}
+    for p_num, (text, conf) in cached_ocr_results.items():
+        ocr_results[p_num] = (text, conf, None)
+
+    if pages_to_ocr:
+        if len(pages_to_ocr) == 1:
+            p_num = pages_to_ocr[0]
+            _, ocr_text, mean_conf, sha1, err = _ocr_page_worker(
+                (file_path, p_num, ocr_min_conf, config, OCR_RENDER_DPI)
+            )
+            if sha1:
+                _PDF_PAGE_CACHE[sha1] = (ocr_text, mean_conf)
+            ocr_results[p_num] = (ocr_text, mean_conf, err)
+        else:
+            workers = min(4, os.cpu_count() or 1, len(pages_to_ocr))
+            worker_args = [
+                (file_path, p, ocr_min_conf, config, OCR_RENDER_DPI)
+                for p in pages_to_ocr
+            ]
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                results = list(executor.map(_ocr_page_worker, worker_args))
+            for p_num, ocr_text, mean_conf, sha1, err in results:
+                if sha1:
+                    _PDF_PAGE_CACHE[sha1] = (ocr_text, mean_conf)
+                ocr_results[p_num] = (ocr_text, mean_conf, err)
+
+    # Reconstruct chunks in strict deterministic page order
+    total_pages = len(native_pages) + len(ocr_results)
+    for page_num in range(total_pages):
+        location = f"page:{page_num + 1}"
+        if page_num in native_pages:
             chunks.append(Chunk(
                 file=file_path,
                 location=location,
-                text=native_text,
+                text=native_pages[page_num],
                 method="native",
                 ocr_confidence=None,
                 order_index=order,
             ))
             order += 1
-        else:
-            # Scanned or minimal text — try OCR
-            log.info("Page %d of %s: native text too short (%d chars), trying OCR",
-                     page_num + 1, path.name, len(native_text))
-            try:
-                pil_img = _render_page(page, dpi=OCR_RENDER_DPI)
-                ocr_text, mean_conf = ocr_image(
-                    pil_img, min_confidence=ocr_min_conf, config=config
-                )
-            except Exception as exc:
-                log.error("OCR failed on page %d of %s: %s", page_num + 1, path.name, exc)
+        elif page_num in ocr_results:
+            ocr_text, mean_conf, err = ocr_results[page_num]
+            if err:
+                log.error("OCR failed on page %d of %s: %s", page_num + 1, path.name, err)
                 chunks.append(Chunk(
                     file=file_path,
                     location=location,
@@ -140,12 +220,9 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                     method="blocked",
                     ocr_confidence=None,
                     order_index=order,
-                    blocked_reason=f"OCR error: {exc}",
+                    blocked_reason=f"OCR error: {err}",
                 ))
-                order += 1
-                continue
-
-            if not is_tesseract_available():
+            elif not is_tesseract_available():
                 chunks.append(Chunk(
                     file=file_path,
                     location=location,
@@ -189,7 +266,6 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                 ))
             order += 1
 
-    doc.close()
     log.info("PDF %s → %d chunks (%d blocked)",
              path.name,
              len(chunks),
