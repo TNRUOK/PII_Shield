@@ -90,9 +90,7 @@ def _deskew(gray: np.ndarray) -> np.ndarray:
         return gray  # not enough content to estimate angle
 
     angle = cv2.minAreaRect(coords)[-1]
-    # minAreaRect returns angles in [-90, 0); convert to [-45, 45)
-    if angle < -45:
-        angle = 90 + angle
+    angle = -(90 + angle) if angle < -45 else -angle
 
     if abs(angle) < 0.5:
         return gray  # negligible skew — skip rotation to avoid degradation

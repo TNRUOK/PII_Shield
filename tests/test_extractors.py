@@ -127,3 +127,40 @@ class TestPPTXExtractor:
     def test_metadata_present(self, pptx_chunks):
         meta = [c for c in pptx_chunks if "metadata" in c.location]
         assert len(meta) > 0
+
+
+class TestDeskew:
+    @pytest.mark.parametrize("angle", [3.0, 5.0, -4.0])
+    def test_deskew_rotations(self, angle):
+        import difflib
+        from PIL import Image, ImageDraw, ImageFont
+        from extract.ocr import ocr_image, is_tesseract_available
+
+        if not is_tesseract_available():
+            pytest.skip("Tesseract is not available")
+
+        text_lines = [
+            "Cadence Financial Services Audit Report",
+            "Confidential Employee Compliance Guidelines",
+            "Data protection procedures must be strictly followed.",
+            "All records herein are synthetic and for verification only.",
+            "Authorized Personnel: Operations Oversight Unit"
+        ]
+        gt_text = " ".join(text_lines)
+        img = Image.new("RGB", (1000, 500), (255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 24)
+        except OSError:
+            font = ImageFont.load_default()
+
+        y = 50
+        for line in text_lines:
+            draw.text((50, y), line, fill=(0, 0, 0), font=font)
+            y += 50
+
+        rotated = img.rotate(angle, expand=False, fillcolor=(255, 255, 255))
+        ocr_text, conf = ocr_image(rotated)
+        clean_ocr = " ".join(ocr_text.split())
+        ratio = difflib.SequenceMatcher(None, clean_ocr.lower(), gt_text.lower()).ratio()
+        assert ratio >= 0.95, f"Deskew failed at {angle} deg: ratio={ratio:.4f}"
