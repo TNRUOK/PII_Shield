@@ -148,11 +148,20 @@ def ssn_sanity(ssn: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def ipv4_check(ip: str) -> bool:
-    """Return True if `ip` is a valid IPv4 address (all octets 0-255)."""
+    """
+    Return True if `ip` is a valid IPv4 address (all octets 0-255).
+    Leading zeros in octets are accepted (e.g. '192.168.01.01') to handle
+    OCR noise and manual formatting differences.
+    Note: The rule uses soft_penalty so private ranges still generate hits
+    but at reduced confidence.
+    """
+    # Strip angle brackets or whitespace that might surround the IP
+    ip = ip.strip().strip("<>")
     parts = ip.split(".")
     if len(parts) != 4:
         return False
     try:
-        return all(0 <= int(p) <= 255 and p == str(int(p)) for p in parts)
+        # int() strips leading zeros; check range only (don't require canonical form)
+        return all(0 <= int(p) <= 255 for p in parts if p)
     except ValueError:
         return False

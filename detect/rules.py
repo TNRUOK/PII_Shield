@@ -51,7 +51,7 @@ RULES = [
     # --- Email ---
     {
         "pattern": _compile(
-            r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
+            r"<?[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,10}(?:\.[a-zA-Z]{2,6})?>?"
         ),
         "entity_type": "EMAIL",
         "validator": None,
@@ -78,7 +78,7 @@ RULES = [
     # --- India Phone: +91 followed by 10 digits ---
     {
         "pattern": _compile(
-            r"(?<!\d)(\+91[\s\-]?|0)?[6-9]\d{9}(?!\d)"
+            r"(?:^|(?<=[^\d+]))(\+91[\s\-]?|0)?[6-9]\d{9}(?!\d)"
         ),
         "entity_type": "PHONE",
         "validator": None,
@@ -149,6 +149,18 @@ RULES = [
         "validator": lambda t: verhoeff_check(re.sub(r"[\s\-]", "", t)),
         "confidence": 0.85,
         "soft_penalty": 0.20,  # soft: reduce by 0.20 if checksum fails
+        "sensitivity": "High",
+    },
+
+    # --- Aadhaar: bare 12 contiguous digits (OCR collapses separators) ---
+    {
+        "pattern": _compile(
+            r"(?<![0-9])\d{12}(?![0-9])"
+        ),
+        "entity_type": "AADHAAR",
+        "validator": verhoeff_check,
+        "confidence": 0.70,
+        "soft_penalty": 0.20,  # soft: reduce if Verhoeff fails
         "sensitivity": "High",
     },
 
@@ -230,8 +242,33 @@ RULES = [
         "entity_type": "IP_ADDRESS",
         "validator": ipv4_check,
         "confidence": 0.90,
-        "soft_penalty": 1.0,
+        "soft_penalty": 1.0,  # hard-reject on invalid octets; valid private IPs pass ipv4_check
         "sensitivity": "Low",
+    },
+
+
+    # --- IPv4 labelled: "IP:" or "IP address:" context boost ---
+    {
+        "pattern": _compile(
+            r"(?:ip(?:\s+address)?|host)\s*[:\-]\s*((?:\d{1,3}\.){3}\d{1,3})\b"
+        ),
+        "entity_type": "IP_ADDRESS",
+        "validator": lambda t: ipv4_check(re.search(r"((?:\d{1,3}\.){3}\d{1,3})", t).group(1) if re.search(r"((?:\d{1,3}\.){3}\d{1,3})", t) else t),
+        "confidence": 0.88,
+        "soft_penalty": 1.0,  # hard-reject labelled IP if octets are invalid
+        "sensitivity": "Low",
+    },
+
+    # --- SSN (bare 9 digits in labelled context: near word 'ssn' or 'social') ---
+    {
+        "pattern": _compile(
+            r"(?:ssn|social\s+security(?:\s+(?:no|number|#))?)\s*[:\-]?\s*(\d{9})\b"
+        ),
+        "entity_type": "SSN",
+        "validator": None,
+        "confidence": 0.85,
+        "soft_penalty": 0.0,
+        "sensitivity": "High",
     },
 
     # --- IPv6 address (simplified) ---
