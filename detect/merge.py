@@ -178,7 +178,21 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
         return []
 
     rule_hits = run_rules(chunk.text, config)
-    ner_hits = run_ner(chunk.text, config)
+
+    # Run NER per table cell (not on the pipe-joined row) to prevent pipe delimiter confusion
+    if "table:" in chunk.location and "|" in chunk.text:
+        ner_hits = []
+        char_offset = 0
+        for cell in chunk.text.split("|"):
+            if cell.strip():
+                cell_hits = run_ner(cell, config)
+                for h in cell_hits:
+                    h.start += char_offset
+                    h.end += char_offset
+                    ner_hits.append(h)
+            char_offset += len(cell) + 1  # +1 for the pipe separator
+    else:
+        ner_hits = run_ner(chunk.text, config)
 
     all_hits = rule_hits + ner_hits
     context_new, all_hits = run_context(

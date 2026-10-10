@@ -81,8 +81,13 @@ def _extract_shape_chunks(
         # Detect header: first row
         if rows:
             first_row_texts = [cell.text.strip() for cell in rows[0].cells]
-            kw = {"name", "email", "phone", "employee", "contact",
-                  "owner", "approver", "id", "staff", "role", "title"}
+            kw = {
+                "name", "email", "phone", "employee", "contact", "owner", "approver",
+                "id", "staff", "role", "title", "user", "users", "member", "members",
+                "reviewer", "author", "assignee", "respondent", "custodian",
+                "delegate", "stakeholder", "participant", "operator", "signoff",
+                "client contact", "peer reviewer", "qa reviewer"
+            }
             if any(t.lower() in kw for t in first_row_texts):
                 header_texts = first_row_texts
 

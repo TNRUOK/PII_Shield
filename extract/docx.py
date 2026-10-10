@@ -40,8 +40,13 @@ _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _REL_IMG = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 
 # If a table's first row contains any of these keywords we treat it as a header row
-_HEADER_KEYWORDS = {"name", "email", "phone", "employee", "contact",
-                    "owner", "approver", "id", "staff", "emp"}
+_HEADER_KEYWORDS = {
+    "name", "email", "phone", "employee", "contact", "owner", "approver", "id",
+    "staff", "emp", "user", "users", "member", "members", "reviewer", "author",
+    "assignee", "respondent", "custodian", "delegate", "stakeholder", "participant",
+    "operator", "signoff", "lead", "manager", "attendee", "client contact",
+    "peer reviewer", "qa reviewer"
+}
 
 
 def _row_is_header(row) -> bool:

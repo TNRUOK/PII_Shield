@@ -325,3 +325,79 @@ class TestIndiaPlusPhone:
         phones = [h for h in hits if h.entity_type == "PHONE"]
         assert len(phones) >= 1
 
+
+class TestContextInitialsAndTables:
+    def test_users_column_initials_names(self, config):
+        """Table with USERS column containing 3 initials-style names must detect all 3."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        rows = [
+            ("table:1/r2[headers: ID | Users | Role]", "101 | TJ Harlan | Engineer"),
+            ("table:1/r3[headers: ID | Users | Role]", "102 | PQ Lindqvist | Architect"),
+            ("table:1/r4[headers: ID | Users | Role]", "103 | RK Patel | Analyst"),
+        ]
+
+        found_names = []
+        for loc, row_text in rows:
+            chunk = Chunk(
+                file="test.docx",
+                location=loc,
+                text=row_text,
+                method="native",
+                ocr_confidence=None,
+                order_index=0,
+            )
+            entities = detect_chunk(chunk, config)
+            for e in entities:
+                if e.entity_type == "PERSON":
+                    found_names.append(e.raw_value)
+
+        assert any("TJ Harlan" in n for n in found_names), f"TJ Harlan missed: {found_names}"
+        assert any("PQ Lindqvist" in n for n in found_names), f"PQ Lindqvist missed: {found_names}"
+        assert any("RK Patel" in n for n in found_names), f"RK Patel missed: {found_names}"
+
+    def test_key_value_tables(self, config):
+        """Two-column key-value tables (Key | Value) must detect names from the value column."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        kv_rows = [
+            ("table:2/r1", "Author | Alice Johnson"),
+            ("table:2/r2", "Peer Reviewer | PQ Lindqvist"),
+            ("table:2/r3", "Client Contact | TJ Harlan"),
+            ("table:2/r4", "Prepared by | Bob Smith"),
+        ]
+
+        for loc, row_text in kv_rows:
+            chunk = Chunk(
+                file="test.docx",
+                location=loc,
+                text=row_text,
+                method="native",
+                ocr_confidence=None,
+                order_index=0,
+            )
+            entities = detect_chunk(chunk, config)
+            persons = [e for e in entities if e.entity_type == "PERSON"]
+            assert len(persons) >= 1, f"Failed to detect person in key-value row: {row_text}"
+
+    def test_acronym_not_flagged_in_normal_paragraph(self, config):
+        """Acronyms in normal paragraphs must NOT be flagged as PERSON."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        chunk = Chunk(
+            file="test.docx",
+            location="body",
+            text="All employees must follow the BYOD Allowed policy and use MFA for SSO logins.",
+            method="native",
+            ocr_confidence=None,
+            order_index=0,
+        )
+        entities = detect_chunk(chunk, config)
+        person_names = [e.raw_value for e in entities if e.entity_type == "PERSON"]
+        assert not any("BYOD" in n for n in person_names), f"BYOD incorrectly flagged: {person_names}"
+        assert not any("MFA" in n for n in person_names), f"MFA incorrectly flagged: {person_names}"
+
+

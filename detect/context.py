@@ -32,27 +32,56 @@ log = logging.getLogger(__name__)
 
 # Keywords that trigger column-header confidence boost
 _HEADER_PII_KEYWORDS = re.compile(
-    r"\b(name|employee|emp|contact|email|phone|mobile|owner|approver|staff|id)\b",
+    r"\b(name|employee|emp|contact|email|phone|mobile|owner|approver|staff|id|"
+    r"user|users|member|members|reviewer|author|assignee|respondent|"
+    r"peer\s+reviewer|qa\s+reviewer|client\s+contact|prepared\s+by|submitted\s+by)\b",
     re.IGNORECASE,
 )
 
-# Labelled-name pattern: keyword followed by name (allows optional newline for OCR output)
-_LABELLED_NAME = re.compile(
-    r"(?i:\b(?:prepared\s+by|approved\s+by|author|owner|submitted\s+by|signed\s+by"
-    r"|full\s+name|employee\s+name|staff\s+name|name))\s*[:\-]\n?\s*"
-    r"([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){1,3})"
+# Headers indicating a person/name column
+_NAME_HEADER_KEYWORDS = re.compile(
+    r"\b(name|employee|emp|staff|person|contact|owner|author|lead|manager|attendee|"
+    r"user|users|member|members|reviewer|assignee|respondent|approver|"
+    r"peer\s+reviewer|qa\s+reviewer|client\s+contact)\b",
+    re.IGNORECASE,
 )
 
-# Title-case name: 2-4 capitalised words (used in column context)
-_TITLE_CASE_NAME = re.compile(
-    r"\b([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){1,3})\b"
+# Labelled keys for key-value formats
+_LABEL_KEYS = (
+    r"(?:prepared\s+by|approved\s+by|author(?:\(s\))?|owner|submitted\s+by|signed\s+by|"
+    r"reviewer|peer\s+reviewer|qa\s+reviewer|client\s+contact|assignee|respondent|approver|"
+    r"user|member|members|full\s+name|employee\s+name|staff\s+name|name)"
+)
+
+# Initials-name pattern: e.g. "TJ Harlan", "PQ Lindqvist", "J. Doe", "A. B. Smith", "J Doe", "RK Patel"
+_INITIALS_NAME_PATTERN = r"[A-Z]{1,3}\.?\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?"
+_TITLE_CASE_NAME_PATTERN = r"[A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){1,3}"
+
+_NAME_OR_INITIALS_PATTERN = rf"(?:{_INITIALS_NAME_PATTERN}|{_TITLE_CASE_NAME_PATTERN})"
+
+_INITIALS_NAME = re.compile(rf"\b({_INITIALS_NAME_PATTERN})\b")
+_TITLE_CASE_NAME = re.compile(rf"\b({_TITLE_CASE_NAME_PATTERN})\b")
+
+# Labelled-name pattern: keyword followed by name (allows optional newline for OCR output)
+_LABELLED_NAME = re.compile(
+    rf"(?i:\b{_LABEL_KEYS})\s*[:\-]\n?\s*({_NAME_OR_INITIALS_PATTERN})"
+)
+
+# Key-Value 2-column table label
+_KV_LABEL_PAT = re.compile(
+    rf"^(?:{_LABEL_KEYS})$",
+    re.IGNORECASE,
 )
 
 _NAME_STOP_WORDS = {
     "employee", "staff", "id", "email", "phone", "mobile", "ssn", "dept",
     "department", "title", "role", "system", "product", "note", "approved",
     "prepared", "contact", "signatory", "owner", "author", "reviewed", "primary",
-    "by", "section", "date", "status", "version", "questions"
+    "by", "section", "date", "status", "version", "questions", "user", "users",
+    "member", "members", "reviewer", "assignee", "respondent", "custodian",
+    "delegate", "stakeholder", "participant", "operator", "signoff", "manager",
+    "lead", "attendee", "company", "services", "financial", "technologies",
+    "solutions", "limited", "corp", "inc", "ltd"
 }
 
 
@@ -126,38 +155,77 @@ def run_context(
                 if "context" not in hit.method:
                     hit.method = hit.method + "+context"
 
-        # Strategy 3: unlabelled capitalised strings in a "name" column
+        # --- Strategy 3: Unlabelled names in a name column ---
         name_col_indices = {
             i for i, h in enumerate(headers)
-            if re.search(r"\bname\b|\bemployee\b", h, re.IGNORECASE)
+            if _NAME_HEADER_KEYWORDS.search(h)
         }
         if name_col_indices:
             cells = chunk_text.split("|")
             char_offset = 0
             for col_i, cell in enumerate(cells):
                 if col_i in name_col_indices:
-                    m = _TITLE_CASE_NAME.search(cell)
-                    if m:
-                        global_start = char_offset + m.start()
-                        global_end = char_offset + m.end()
-                        # Only add if not already covered by existing hits
+                    # Match both full title-case names and initials-style names
+                    cand_matches = (
+                        list(_TITLE_CASE_NAME.finditer(cell)) +
+                        list(_INITIALS_NAME.finditer(cell))
+                    )
+                    for m in cand_matches:
+                        raw_val = m.group(1).strip()
+                        words = raw_val.split()
+                        if any(w.strip(":-.").lower() in _NAME_STOP_WORDS for w in words):
+                            continue
+                        global_start = char_offset + m.start(1)
+                        global_end = char_offset + m.end(1)
                         covered = any(
                             h.start <= global_start and h.end >= global_end
-                            for h in updated
+                            for h in (updated + new_hits)
                         )
                         if not covered:
                             new_hits.append(RawHit(
                                 entity_type="PERSON",
                                 start=global_start,
                                 end=global_end,
-                                text=m.group(1),
+                                text=raw_val,
                                 confidence=unlabelled_conf,
                                 sensitivity="Medium",
                                 method="context",
                             ))
                 char_offset += len(cell) + 1  # +1 for the pipe separator
 
-    # --- Strategy 2: Labelled-name patterns ---
+    # --- Strategy 2b: Two-column key-value tables (Key | Value) ---
+    if "|" in chunk_text:
+        cells = chunk_text.split("|")
+        if len(cells) >= 2 and _KV_LABEL_PAT.match(cells[0].strip()):
+            val_cell = cells[1]
+            val_offset = len(cells[0]) + 1
+            cand_matches = (
+                list(_TITLE_CASE_NAME.finditer(val_cell)) +
+                list(_INITIALS_NAME.finditer(val_cell))
+            )
+            for m in cand_matches:
+                raw_val = m.group(1).strip()
+                words = raw_val.split()
+                if any(w.strip(":-.").lower() in _NAME_STOP_WORDS for w in words):
+                    continue
+                global_start = val_offset + m.start(1)
+                global_end = val_offset + m.end(1)
+                covered = any(
+                    h.start <= global_start and h.end >= global_end
+                    for h in (updated + new_hits)
+                )
+                if not covered:
+                    new_hits.append(RawHit(
+                        entity_type="PERSON",
+                        start=global_start,
+                        end=global_end,
+                        text=raw_val,
+                        confidence=labelled_conf,
+                        sensitivity="Medium",
+                        method="context",
+                    ))
+
+    # --- Strategy 2: Labelled-name patterns (Key: Value) ---
     for m in _LABELLED_NAME.finditer(chunk_text):
         raw_name = m.group(1)
         words = raw_name.split()
@@ -179,7 +247,7 @@ def run_context(
         covered = any(
             h.entity_type == "PERSON" and
             h.start <= name_start and h.end >= name_end
-            for h in updated
+            for h in (updated + new_hits)
         )
         if not covered:
             new_hits.append(RawHit(
