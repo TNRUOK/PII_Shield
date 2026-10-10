@@ -47,6 +47,23 @@ def pil_to_cv2(img: Image.Image) -> np.ndarray:
     return cv2.cvtColor(np.array(img.convert("RGB")), cv2.COLOR_RGB2BGR)
 
 
+def _upsample_if_small(img: Image.Image, min_dim: int = 1800) -> Image.Image:
+    """
+    If the smallest dimension of the image is below `min_dim`, upscale
+    proportionally using Lanczos resampling (equivalent to raising a low-DPI
+    scan to ~300 dpi for Tesseract).
+    """
+    w, h = img.size
+    small = min(w, h)
+    if small < min_dim:
+        scale = min_dim / small
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+        log.debug("Upsampled image from %dx%d to %dx%d", w, h, new_w, new_h)
+    return img
+
+
 def cv2_to_pil(arr: np.ndarray) -> Image.Image:
     """Convert an OpenCV array (BGR or grayscale) to PIL Image."""
     if len(arr.shape) == 2:
@@ -96,17 +113,19 @@ def preprocess(img: Image.Image) -> np.ndarray:
       3. Fast non-local means denoising
       4. Adaptive (Gaussian) thresholding
     """
+    # Upsample before any processing so Tesseract sees ≥300 dpi equivalent
+    img = _upsample_if_small(img, min_dim=1800)
     arr = pil_to_cv2(img)
     gray = cv2.cvtColor(arr, cv2.COLOR_BGR2GRAY)
     gray = _deskew(gray)
     # Denoise — conservative parameters to avoid blurring thin strokes
     denoised = cv2.fastNlMeansDenoising(gray, h=10, templateWindowSize=7, searchWindowSize=21)
-    # Adaptive threshold — better than global Otsu on documents with uneven lighting
+    # Adaptive threshold — larger blockSize handles uneven lighting on low-DPI scans better
     binary = cv2.adaptiveThreshold(
         denoised, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        blockSize=11, C=2,
+        blockSize=31, C=5,
     )
     return binary
 
@@ -143,29 +162,53 @@ def ocr_image(
     preprocessed = preprocess(img)
     pil_preprocessed = cv2_to_pil(preprocessed)
 
-    # image_to_data returns one row per word with individual confidence values
-    try:
-        data = pytesseract.image_to_data(
-            pil_preprocessed,
-            lang=lang,
-            output_type=Output.DATAFRAME,
-        )
-    except pytesseract.TesseractNotFoundError:
-        log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
+    def _run_tesseract(pil_img: Image.Image, psm: int) -> "pd.DataFrame | None":
+        """Run tesseract with LSTM engine and given PSM; return dataframe or None."""
+        tess_config = f"--oem 3 --psm {psm}"
+        try:
+            return pytesseract.image_to_data(
+                pil_img,
+                lang=lang,
+                config=tess_config,
+                output_type=Output.DATAFRAME,
+            )
+        except pytesseract.TesseractNotFoundError:
+            log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
+            return None
+        except Exception as exc:
+            log.error("Tesseract execution failed (psm=%d): %s", psm, exc)
+            return None
+
+    # Primary attempt: PSM 6 — assume uniform block of text (best for documents)
+    data = _run_tesseract(pil_preprocessed, psm=6)
+    if data is None:
         return "", 0.0
 
-    except Exception as exc:
-        log.error("Tesseract execution failed: %s", exc)
-        return "", 0.0
-
-    # Filter out rows where Tesseract didn't assign a confidence (conf == -1)
     valid = data[data["conf"] > 0].copy()
+    mean_conf = float(valid["conf"].mean()) if not valid.empty else 0.0
+
+    # Fallback: PSM 3 (fully automatic) when primary confidence is very low
+    if mean_conf < 50 or valid.empty:
+        log.info(
+            "OCR PSM-6 low confidence (%.1f). Retrying with PSM-3 (auto page segmentation)...",
+            mean_conf,
+        )
+        data2 = _run_tesseract(pil_preprocessed, psm=3)
+        if data2 is not None:
+            valid2 = data2[data2["conf"] > 0].copy()
+            mean_conf2 = float(valid2["conf"].mean()) if not valid2.empty else 0.0
+            if mean_conf2 > mean_conf:
+                log.info("PSM-3 retry improved confidence: %.1f → %.1f", mean_conf, mean_conf2)
+                valid = valid2
+                mean_conf = mean_conf2
 
     if valid.empty:
-        log.warning("Tesseract returned no words with positive confidence")
+        log.warning(
+            "Tesseract returned no words with positive confidence (image size: %s)",
+            img.size,
+        )
         return "", 0.0
 
-    mean_conf = float(valid["conf"].mean())
     words = valid["text"].dropna().astype(str).tolist()
     text = " ".join(w for w in words if w.strip())
 

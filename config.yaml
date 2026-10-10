@@ -51,3 +51,7 @@ output:
 
 # Minimum meaningful text chars on a PDF page (below → try OCR)
 pdf_native_min_chars: 50
+
+# OCR engine settings (Tesseract)
+ocr_psm: 6        # Page Segmentation Mode: 6=uniform block, 3=auto (fallback)
+ocr_oem: 3        # OCR Engine Mode: 3=LSTM only (best accuracy)
