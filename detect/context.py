@@ -48,6 +48,13 @@ _TITLE_CASE_NAME = re.compile(
     r"\b([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){1,3})\b"
 )
 
+_NAME_STOP_WORDS = {
+    "employee", "staff", "id", "email", "phone", "mobile", "ssn", "dept",
+    "department", "title", "role", "system", "product", "note", "approved",
+    "prepared", "contact", "signatory", "owner", "author", "reviewed", "primary",
+    "by", "section", "date", "status", "version", "questions"
+}
+
 
 def _parse_headers_from_location(location: str) -> List[str]:
     """Extract header texts embedded in the location string like [headers: A | B | C]."""
@@ -152,9 +159,22 @@ def run_context(
 
     # --- Strategy 2: Labelled-name patterns ---
     for m in _LABELLED_NAME.finditer(chunk_text):
-        name_text = m.group(1)
+        raw_name = m.group(1)
+        words = raw_name.split()
+        valid_words = []
+        for w in words:
+            clean_w = w.strip(":-.").lower()
+            if clean_w in _NAME_STOP_WORDS:
+                break
+            valid_words.append(w)
+
+        if not valid_words:
+            continue
+
+        name_text = " ".join(valid_words)
         name_start = m.start(1)
-        name_end = m.end(1)
+        name_end = name_start + len(name_text)
+
         # Don't add if a PERSON hit already covers this span
         covered = any(
             h.entity_type == "PERSON" and

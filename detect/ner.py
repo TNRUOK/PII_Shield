@@ -101,12 +101,29 @@ def run_ner(text: str, config: dict) -> List[RawHit]:
         if conf < min_conf:
             continue
 
-        raw_text = text[res.start: res.end]
+        start = res.start
+        end = res.end
+        raw_text = text[start: end]
+
+        if our_type == "PERSON":
+            from detect.context import _NAME_STOP_WORDS
+            words = raw_text.split()
+            valid_words = []
+            for w in words:
+                clean_w = w.strip(":-.").lower()
+                if clean_w in _NAME_STOP_WORDS:
+                    break
+                valid_words.append(w)
+            if not valid_words:
+                continue
+            trimmed_text = " ".join(valid_words)
+            end = start + len(trimmed_text)
+            raw_text = trimmed_text
 
         hits.append(RawHit(
             entity_type=our_type,
-            start=res.start,
-            end=res.end,
+            start=start,
+            end=end,
             text=raw_text,
             confidence=conf,
             sensitivity=_SENSITIVITY.get(our_type, "Medium"),
