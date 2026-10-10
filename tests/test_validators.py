@@ -157,5 +157,11 @@ class TestIPv4:
         assert ipv4_check("a.b.c.d") is False
 
     def test_leading_zeros(self):
-        # "010" is ambiguous — we treat it as invalid (non-canonical)
-        assert ipv4_check("010.0.0.1") is False
+        # Leading-zero octets are now accepted (OCR noise tolerance).
+        # '010' is parsed as decimal 10, which is a valid octet.
+        assert ipv4_check("010.0.0.1") is True
+
+    def test_out_of_range_octet_rejected(self):
+        # Octets > 255 must always be rejected regardless of leading-zero policy.
+        assert ipv4_check("256.0.0.1") is False
+        assert ipv4_check("999.0.0.1") is False

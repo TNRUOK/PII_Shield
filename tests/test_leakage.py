@@ -104,3 +104,68 @@ def test_blocked_chunk_handled_safely(config):
     result = check_leakage(chunks, config)
     assert result.downstream_safe is True
     assert len(result.leaks) == 0
+
+
+# ---------------------------------------------------------------------------
+# New leakage tests (P2 fixes)
+# ---------------------------------------------------------------------------
+
+def test_strip_placeholders_uses_block_symbol():
+    """Placeholder substitution must use '██' not ',' to avoid false regex matches."""
+    text = "Call [PHONE_1] for details."
+    stripped = _strip_placeholders(text)
+    # Must not contain commas that could form phone/date false positives
+    assert "," not in stripped
+    # Must contain the block symbol
+    assert "██" in stripped
+
+
+def test_placeholder_substitution_does_not_produce_ip_false_positive(config):
+    """'██' separator between numbers must not match IP address regex."""
+    from detect.rules import run_rules
+    # Simulate a text where placeholders are replaced
+    text = "Values: ██ 55 ██ 3 ██ 22"
+    hits = run_rules(text, config)
+    ips = [h for h in hits if h.entity_type == "IP_ADDRESS"]
+    assert len(ips) == 0, "Block symbol separator must not create IP address false positives"
+
+
+def test_simplename_space_scan_chunk_works(config):
+    """The SimpleNamespace scan chunk must behave identically to a real Chunk."""
+    from types import SimpleNamespace
+    from detect.merge import detect_chunk
+
+    # Build a SimpleNamespace the same way leakage.py does
+    scan_chunk = SimpleNamespace(
+        file="test.txt",
+        location="page:1",
+        text="Contact alice@example.com for help.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+        blocked_reason=None,
+        is_blocked=lambda: False,
+    )
+    entities = detect_chunk(scan_chunk, config)
+    types = {e.entity_type for e in entities}
+    assert "EMAIL" in types, "SimpleNamespace scan chunk must work with detect_chunk"
+
+
+def test_all_blocked_chunks_return_zero_leaks(config):
+    """A document with all chunks blocked must produce safe=True with no errors."""
+    chunks = [
+        Chunk(
+            file="blocked_doc.pdf",
+            location=f"page:{i}",
+            text="",
+            method="blocked",
+            ocr_confidence=5.0,
+            order_index=i,
+            blocked_reason="OCR too low",
+        )
+        for i in range(1, 4)
+    ]
+    result = check_leakage(chunks, config)
+    assert result.downstream_safe is True
+    assert len(result.leaks) == 0
+
