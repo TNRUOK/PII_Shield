@@ -152,16 +152,15 @@ def ipv4_check(ip: str) -> bool:
     Return True if `ip` is a valid IPv4 address (all octets 0-255).
     Leading zeros in octets are accepted (e.g. '192.168.01.01') to handle
     OCR noise and manual formatting differences.
-    Note: The rule uses soft_penalty so private ranges still generate hits
-    but at reduced confidence.
+    Also handles OCR separator variations (spaces, missing dot in fused octet).
     """
-    # Strip angle brackets or whitespace that might surround the IP
     ip = ip.strip().strip("<>")
-    parts = ip.split(".")
+    parts = [p for p in re.split(r"[\.\s,;]+", ip) if p]
+    if len(parts) == 3 and len(parts[0]) == 4 and parts[0].isdigit():
+        parts = [parts[0][:2], parts[0][2:]] + parts[1:]
     if len(parts) != 4:
         return False
     try:
-        # int() strips leading zeros; check range only (don't require canonical form)
         return all(0 <= int(p) <= 255 for p in parts if p)
     except ValueError:
         return False

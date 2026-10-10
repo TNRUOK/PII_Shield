@@ -250,10 +250,10 @@ RULES = [
     # --- IPv4 labelled: "IP:" or "IP address:" context boost ---
     {
         "pattern": _compile(
-            r"(?:ip(?:\s+address)?|host)\s*[:\-]\s*((?:\d{1,3}\.){3}\d{1,3})\b"
+            r"(?i:ip(?:\s+address)?(?:\s*\([^)]*\))?|host)\s*[:\.\-]\s*([0-9\.\s]{7,18})\b"
         ),
         "entity_type": "IP_ADDRESS",
-        "validator": lambda t: ipv4_check(re.search(r"((?:\d{1,3}\.){3}\d{1,3})", t).group(1) if re.search(r"((?:\d{1,3}\.){3}\d{1,3})", t) else t),
+        "validator": lambda t: ipv4_check(re.search(r"([0-9\.\s]{7,18})", t).group(1) if re.search(r"([0-9\.\s]{7,18})", t) else t),
         "confidence": 0.88,
         "soft_penalty": 1.0,  # hard-reject labelled IP if octets are invalid
         "sensitivity": "Low",
