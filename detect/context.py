@@ -36,9 +36,10 @@ _HEADER_PII_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
-# Labelled-name pattern: keyword followed by name
+# Labelled-name pattern: keyword followed by name (allows optional newline for OCR output)
 _LABELLED_NAME = re.compile(
-    r"(?i:\b(?:prepared\s+by|approved\s+by|author|owner|submitted\s+by|signed\s+by))\s*[:\-]\s*"
+    r"(?i:\b(?:prepared\s+by|approved\s+by|author|owner|submitted\s+by|signed\s+by"
+    r"|full\s+name|employee\s+name|staff\s+name|name))\s*[:\-]\n?\s*"
     r"([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20}){1,3})"
 )
 
