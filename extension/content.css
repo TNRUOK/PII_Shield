@@ -1,33 +1,62 @@
-/* Floating action button */
-#pii-shield-float-btn {
+/* Floating action widget container */
+#pii-shield-widget {
   position: fixed;
   bottom: 24px;
   right: 24px;
   z-index: 999999;
-  background: linear-gradient(135deg, #0ea5e9, #2563eb);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.25s ease;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 999px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.pii-widget-btn {
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
   user-select: none;
 }
 
-#pii-shield-float-btn:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.45);
+.pii-widget-btn:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
 }
 
-#pii-shield-float-btn:active {
+.pii-widget-btn:active {
   transform: translateY(1px);
 }
+
+.pii-widget-btn.secondary {
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.pii-widget-btn.secondary:hover {
+  background: rgba(51, 65, 85, 0.9);
+}
+
+.pii-widget-btn:disabled,
+.pii-widget-btn.loading {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
 
 /* Toast notification */
 #pii-shield-toast {

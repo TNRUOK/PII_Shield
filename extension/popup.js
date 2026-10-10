@@ -2,24 +2,64 @@ const BRIDGE_URL = "http://127.0.0.1:8765";
 
 let currentSessionId = null;
 
-// Load stored session ID if available
-chrome.storage.local.get(["sessionId"], (res) => {
+// Initialize Session
+function updateSessionDisplay() {
+  const lbl = document.getElementById("sessionLabel");
+  if (currentSessionId) {
+    lbl.textContent = "Session: " + currentSessionId.slice(0, 8);
+  } else {
+    lbl.textContent = "Session: New";
+  }
+}
+
+chrome.storage.local.get(["sessionId", "profile"], (res) => {
   if (res.sessionId) {
     currentSessionId = res.sessionId;
-    document.getElementById("sessionLabel").textContent = "Session: " + currentSessionId.slice(0, 8);
+    updateSessionDisplay();
   }
+  if (res.profile) {
+    const profSelect = document.getElementById("profileSelect");
+    if (profSelect) profSelect.value = res.profile;
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.sessionId) {
+    currentSessionId = changes.sessionId.newValue;
+    updateSessionDisplay();
+  }
+});
+
+// Profile change listener
+document.getElementById("profileSelect").addEventListener("change", (e) => {
+  chrome.storage.local.set({ profile: e.target.value });
+});
+
+function getActiveProfile() {
+  const sel = document.getElementById("profileSelect");
+  return sel ? sel.value : "balanced";
+}
+
+// Reset / New Session
+document.getElementById("newSessionBtn").addEventListener("click", () => {
+  currentSessionId = null;
+  chrome.storage.local.remove(["sessionId"], () => {
+    updateSessionDisplay();
+    flashBtn("newSessionBtn", "Reset!");
+  });
 });
 
 // Check Server Health
 async function checkHealth() {
   const badge = document.getElementById("statusBadge");
   const text = document.getElementById("statusText");
+  text.textContent = "Checking...";
   try {
-    const res = await fetch(`${BRIDGE_URL}/health`);
+    const res = await fetch(`${BRIDGE_URL}/health`, { method: "GET" });
     if (res.ok) {
       const data = await res.json();
       badge.className = "status-badge";
-      text.textContent = "Online (" + data.profile + ")";
+      text.textContent = `Online (${data.profile || "ready"})`;
     } else {
       throw new Error("HTTP " + res.status);
     }
@@ -28,6 +68,8 @@ async function checkHealth() {
     text.textContent = "Offline (Start Server)";
   }
 }
+
+document.getElementById("statusBadge").addEventListener("click", checkHealth);
 
 // Tab Switching
 document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -52,13 +94,19 @@ document.getElementById("redactBtn").addEventListener("click", async () => {
     const res = await fetch(`${BRIDGE_URL}/redact_text`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: jsonBody({ text: input, session_id: currentSessionId }),
+      body: JSON.stringify({
+        text: input,
+        session_id: currentSessionId,
+        profile: getActiveProfile(),
+      }),
     });
+
+    if (!res.ok) throw new Error("Server returned HTTP " + res.status);
 
     const data = await res.json();
     currentSessionId = data.session_id;
     chrome.storage.local.set({ sessionId: currentSessionId });
-    document.getElementById("sessionLabel").textContent = "Session: " + currentSessionId.slice(0, 8);
+    updateSessionDisplay();
 
     const resultBox = document.getElementById("redactedResult");
     resultBox.textContent = data.redacted_text;
@@ -75,10 +123,10 @@ document.getElementById("redactBtn").addEventListener("click", async () => {
         chipsContainer.appendChild(chip);
       });
     } else {
-      chipsContainer.innerHTML = "<span style='font-size:11px;color:#10b981;'>✅ No PII detected</span>";
+      chipsContainer.innerHTML = "<span style='font-size:11px;color:#10b981;'>✅ No PII detected (Text is clean)</span>";
     }
   } catch (err) {
-    alert("Could not reach PII Shield local bridge. Ensure 'python extension_server/server.py' is running.");
+    alert("Could not reach PII Shield local bridge.\n\nMake sure 'python extension_server/server.py' is running.");
   } finally {
     btn.textContent = "🛡️ Redact PII";
     btn.disabled = false;
@@ -98,36 +146,75 @@ const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 
 dropzone.addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+
+// Drag & drop handlers
+["dragenter", "dragover"].forEach((eventName) => {
+  dropzone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.add("dragover");
+  });
+});
+
+["dragleave", "drop"].forEach((eventName) => {
+  dropzone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.remove("dragover");
+  });
+});
+
+dropzone.addEventListener("drop", (e) => {
+  const dt = e.dataTransfer;
+  if (dt && dt.files && dt.files.length > 0) {
+    handleFileUpload(dt.files[0]);
+  }
+});
+
+fileInput.addEventListener("change", (e) => {
+  if (e.target.files && e.target.files.length > 0) {
+    handleFileUpload(e.target.files[0]);
+  }
+});
+
+async function handleFileUpload(file) {
   if (!file) return;
+
+  const labelEl = dropzone.querySelector(".dropzone-label");
+  labelEl.textContent = "⏳ Parsing & Shielding " + file.name + "...";
 
   const formData = new FormData();
   formData.append("file", file);
-
-  dropzone.querySelector(".dropzone-label").textContent = "⏳ Parsing & Shielding " + file.name + "...";
+  if (currentSessionId) {
+    formData.append("session_id", currentSessionId);
+  }
+  formData.append("profile", getActiveProfile());
 
   try {
     const res = await fetch(`${BRIDGE_URL}/redact_file`, {
       method: "POST",
       body: formData,
     });
+
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
     const data = await res.json();
     currentSessionId = data.session_id;
     chrome.storage.local.set({ sessionId: currentSessionId });
-    document.getElementById("sessionLabel").textContent = "Session: " + currentSessionId.slice(0, 8);
+    updateSessionDisplay();
 
     const docBox = document.getElementById("docResult");
     docBox.textContent = data.redacted_text;
     docBox.style.display = "block";
 
     document.getElementById("copyDocBtn").style.display = "block";
-    dropzone.querySelector(".dropzone-label").textContent = `✅ Sanitized: ${file.name} (${data.detected_pii.length} PII redacted)`;
+    const piiCount = data.detected_pii ? data.detected_pii.length : 0;
+    labelEl.textContent = `✅ Sanitized: ${file.name} (${piiCount} PII masked)`;
   } catch (err) {
-    alert("Error uploading/processing file: " + err.message);
-    dropzone.querySelector(".dropzone-label").textContent = "Click or drop PDF / DOCX / PPTX";
+    alert("Error processing document: " + err.message + "\nCheck server logs.");
+    labelEl.textContent = "Click or drag & drop PDF / DOCX / PPTX";
   }
-});
+}
 
 document.getElementById("copyDocBtn").addEventListener("click", () => {
   const text = document.getElementById("docResult").textContent;
@@ -138,8 +225,21 @@ document.getElementById("copyDocBtn").addEventListener("click", () => {
 // Tab 3: Restore
 document.getElementById("restoreBtn").addEventListener("click", async () => {
   const input = document.getElementById("restoreInput").value;
-  if (!input.trim() || !currentSessionId) {
-    alert("No session active or input empty.");
+  if (!input.trim()) {
+    alert("Please paste the response to decode.");
+    return;
+  }
+
+  // Ensure current session is populated
+  if (!currentSessionId) {
+    const stored = await chrome.storage.local.get(["sessionId"]);
+    if (stored.sessionId) {
+      currentSessionId = stored.sessionId;
+    }
+  }
+
+  if (!currentSessionId) {
+    alert("No active session found. Please redact text or upload a document first.");
     return;
   }
 
@@ -151,10 +251,15 @@ document.getElementById("restoreBtn").addEventListener("click", async () => {
     const res = await fetch(`${BRIDGE_URL}/restore_text`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: jsonBody({ text: input, session_id: currentSessionId }),
+      body: JSON.stringify({
+        text: input,
+        session_id: currentSessionId,
+      }),
     });
-    const data = await res.json();
 
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    const data = await res.json();
     const box = document.getElementById("restoredResult");
     box.textContent = data.restored_text;
     box.style.display = "block";
@@ -172,10 +277,6 @@ document.getElementById("copyRestoredBtn").addEventListener("click", () => {
   flashBtn("copyRestoredBtn", "Copied!");
 });
 
-function jsonBody(obj) {
-  return JSON.stringify(obj);
-}
-
 function flashBtn(id, text) {
   const el = document.getElementById(id);
   const orig = el.textContent;
@@ -183,4 +284,5 @@ function flashBtn(id, text) {
   setTimeout(() => (el.textContent = orig), 1500);
 }
 
+// Initial check
 checkHealth();

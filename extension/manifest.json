@@ -11,6 +11,9 @@
     "http://127.0.0.1:8765/*",
     "http://localhost:8765/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "PII Shield",
@@ -26,7 +29,14 @@
         "https://chat.openai.com/*",
         "https://claude.ai/*",
         "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://poe.com/*",
+        "http://localhost/*",
         "http://localhost:*/*",
+        "http://127.0.0.1/*",
         "http://127.0.0.1:*/*"
       ],
       "js": ["content.js"],

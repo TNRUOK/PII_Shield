@@ -22,8 +22,8 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     body {
-      width: 380px;
-      min-height: 520px;
+      width: 400px;
+      min-height: 540px;
       background: var(--bg);
       color: var(--text);
       padding: 16px;
@@ -34,7 +34,7 @@
       justify-content: space-between;
       border-bottom: 1px solid var(--card-border);
       padding-bottom: 12px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .brand {
       display: flex;
@@ -60,6 +60,7 @@
       background: rgba(16, 185, 129, 0.15);
       color: var(--success);
       border: 1px solid rgba(16, 185, 129, 0.3);
+      cursor: pointer;
     }
     .status-badge.offline {
       background: rgba(239, 68, 68, 0.15);
@@ -71,6 +72,25 @@
       height: 7px;
       border-radius: 50%;
       background: currentColor;
+    }
+
+    .top-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .profile-select {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 11px;
+      outline: none;
+      cursor: pointer;
     }
 
     .tabs {
@@ -108,7 +128,7 @@
 
     textarea {
       width: 100%;
-      height: 100px;
+      height: 110px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 8px;
@@ -159,6 +179,10 @@
     .btn-secondary:hover {
       background: #334155;
     }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
 
     .result-box {
       background: #090d16;
@@ -168,7 +192,7 @@
       margin-top: 8px;
       font-size: 11px;
       line-height: 1.4;
-      max-height: 120px;
+      max-height: 130px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
@@ -201,6 +225,10 @@
       margin-bottom: 12px;
       transition: all 0.2s;
     }
+    .file-dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+    }
     .file-dropzone:hover {
       border-color: var(--accent);
       background: rgba(56, 189, 248, 0.05);
@@ -223,10 +251,27 @@
       font-size: 11px;
       color: var(--text-muted);
     }
+    .session-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .session-reset-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--accent);
+      border-radius: 4px;
+      font-size: 10px;
+      padding: 1px 6px;
+      cursor: pointer;
+    }
+    .session-reset-btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+    }
     .hotkey-tip {
       font-size: 10px;
       color: #64748b;
-      margin-top: 6px;
+      margin-top: 8px;
       text-align: center;
     }
   </style>
@@ -237,10 +282,24 @@
       <span class="brand-icon">🛡️</span>
       <span class="brand-title">PII Shield</span>
     </div>
-    <div id="statusBadge" class="status-badge">
+    <div id="statusBadge" class="status-badge" title="Click to re-check connection">
       <span class="status-dot"></span>
       <span id="statusText">Checking...</span>
     </div>
+  </div>
+
+  <div class="top-controls">
+    <span>Profile:
+      <select id="profileSelect" class="profile-select">
+        <option value="balanced" selected>Balanced</option>
+        <option value="strict">Strict</option>
+        <option value="lenient">Lenient</option>
+      </select>
+    </span>
+    <span class="session-actions">
+      <span id="sessionLabel">Session: New</span>
+      <button id="newSessionBtn" class="session-reset-btn" title="Reset session mapping for a new conversation">➕ New</button>
+    </span>
   </div>
 
   <div class="tabs">
@@ -258,14 +317,14 @@
     </div>
     <div id="redactedResult" class="result-box" style="display:none;"></div>
     <div id="entityChips" class="entity-chips"></div>
-    <div class="hotkey-tip">💡 In ChatGPT/Claude, press <b>Ctrl+Shift+S</b> to auto-shield input!</div>
+    <div class="hotkey-tip">💡 On ChatGPT/Claude/Gemini, press <b>Ctrl+Shift+S</b> to auto-shield!</div>
   </div>
 
   <!-- TAB 2: Document Sanitize -->
   <div id="tabDocument" class="tab-content">
     <div id="dropzone" class="file-dropzone">
-      <div style="font-size: 24px; margin-bottom: 6px;">📄</div>
-      <div class="dropzone-label">Click or drop PDF / DOCX / PPTX</div>
+      <div style="font-size: 26px; margin-bottom: 6px;">📄</div>
+      <div class="dropzone-label">Click or drag & drop PDF / DOCX / PPTX</div>
       <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg">
     </div>
     <div id="docResult" class="result-box" style="display:none;"></div>
@@ -283,8 +342,8 @@
   </div>
 
   <div class="footer">
-    <span>Bridge: 127.0.0.1:8765</span>
-    <span id="sessionLabel">Session: New</span>
+    <span>Local Bridge: 127.0.0.1:8765</span>
+    <span id="healthSub">100% Zero-Cloud</span>
   </div>
 
   <script src="popup.js"></script>

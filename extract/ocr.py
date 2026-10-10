@@ -111,6 +111,12 @@ def preprocess(img: Image.Image) -> np.ndarray:
     return binary
 
 
+def is_tesseract_available() -> bool:
+    """Check if Tesseract executable is found on PATH or at standard Windows paths."""
+    cmd = getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract")
+    return bool(shutil.which(cmd) or (cmd and Path(cmd).is_file()))
+
+
 def ocr_image(
     img: Image.Image,
     lang: str = "eng",
@@ -130,6 +136,10 @@ def ocr_image(
     decides whether to emit a BLOCKED chunk based on the configured threshold.
     This lets unit tests inspect the confidence value independently.
     """
+    if not is_tesseract_available():
+        log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
+        return "", 0.0
+
     preprocessed = preprocess(img)
     pil_preprocessed = cv2_to_pil(preprocessed)
 
@@ -143,6 +153,7 @@ def ocr_image(
     except pytesseract.TesseractNotFoundError:
         log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
         return "", 0.0
+
     except Exception as exc:
         log.error("Tesseract execution failed: %s", exc)
         return "", 0.0
