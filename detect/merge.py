@@ -107,34 +107,38 @@ def merge_hits(
     for hit in sorted_hits[1:]:
         # Check overlap: hit starts before current ends
         if hit.start < current.end:
-            # Overlapping spans
+            # Overlapping spans — always union (T5 fix: do not drop the tail of
+            # a lower-confidence hit that extends beyond the higher-confidence one)
+            union_start = min(current.start, hit.start)
+            union_end   = max(current.end, hit.end)
+            combined_method = current.method + "+" + hit.method
+
             if hit.entity_type == current.entity_type:
                 # Same type → union spans, keep max confidence, combine methods
-                new_hit = RawHit(
+                current = RawHit(
                     entity_type=current.entity_type,
-                    start=min(current.start, hit.start),
-                    end=max(current.end, hit.end),
-                    text="",  # will be re-derived from text in Entity creation
+                    start=union_start,
+                    end=union_end,
+                    text="",  # will be re-derived from chunk text in Entity creation
                     confidence=max(current.confidence, hit.confidence),
                     sensitivity=current.sensitivity,
-                    method=current.method + "+" + hit.method,
+                    method=combined_method,
                 )
-                current = new_hit
             else:
-                # Different type — keep higher confidence, record both methods
-                if hit.confidence > current.confidence:
-                    # Replace but note both methods fired
-                    combined_method = hit.method + "+" + current.method
-                    current = RawHit(
-                        entity_type=hit.entity_type,
-                        start=hit.start,
-                        end=hit.end,
-                        text=hit.text,
-                        confidence=hit.confidence,
-                        sensitivity=hit.sensitivity,
-                        method=combined_method,
-                    )
-                # else: keep current, ignore lower-confidence hit
+                # Different type — always union spans, keep higher-confidence type
+                if hit.confidence >= current.confidence:
+                    winner = hit
+                else:
+                    winner = current
+                current = RawHit(
+                    entity_type=winner.entity_type,
+                    start=union_start,
+                    end=union_end,
+                    text="",  # re-derived below
+                    confidence=max(current.confidence, hit.confidence),
+                    sensitivity=winner.sensitivity,
+                    method=combined_method,
+                )
         else:
             merged.append(current)
             current = hit

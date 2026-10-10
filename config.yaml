@@ -32,6 +32,22 @@ enabled_entities:
   - PERSON
   # - LOCATION   # off by default — high false-positive rate on city/company names
 
+# Denylist for PERSON entities in NER (reject corporate/product/generic terms)
+person_denylist:
+  - Optiv
+  - Cadence
+  - OneTrust
+  - Ironclad
+  - Oracle
+  - ServiceNow
+  - Okta
+  - Launching
+  - Review
+  - Control
+  - Attributes
+  - Workflow
+  - Stage
+
 context:
   table_header_boost: 1.2        # multiply confidence of hits under matching column headers
   labelled_name_confidence: 0.85 # confidence for Prepared-by / Author: / Owner: patterns

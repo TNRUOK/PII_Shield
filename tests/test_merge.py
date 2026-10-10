@@ -90,3 +90,20 @@ class TestMergeHits:
         hits = [_hit("PERSON", 0, 10, 0.85), _hit("PERSON", 9, 20, 0.80)]
         entities = merge_hits(hits, "f.docx", "body", config)
         assert len(entities) == 1
+
+    def test_different_type_overlap_unions_span(self, config):
+        """T5: a lower-confidence hit that overlaps AND extends beyond a higher-confidence hit
+        of a different type must still be fully covered — the union span is kept."""
+        # hit_a: PERSON at [0,15) with high confidence (rule method)
+        # hit_b: EMAIL at [10,25) with lower confidence (ner method)
+        # After T5 fix: result must cover [0,25), not [0,15)
+        hit_a = _hit("PERSON", 0, 15, 0.90, method="rule")
+        hit_b = _hit("EMAIL", 10, 25, 0.70, method="ner")
+        entities = merge_hits([hit_a, hit_b], "f.docx", "body", config)
+        assert len(entities) == 1
+        assert entities[0].start == 0
+        assert entities[0].end == 25, f"Expected end=25, got {entities[0].end}"
+        assert entities[0].entity_type == "PERSON"  # higher confidence wins type
+        # Combined method must contain both original methods
+        combined = "+".join(entities[0].methods)
+        assert "rule" in combined and "ner" in combined, f"Both methods must be recorded, got: {combined}"

@@ -63,6 +63,30 @@ _SENSITIVITY = {
 }
 
 
+def plausible_person(text: str, denylist: set[str]) -> bool:
+    """
+    Validate that an NER-detected PERSON entity is plausible:
+      - Reject single ALL-CAPS tokens (e.g. "MFA", "BYOD", "API")
+      - Reject tokens containing digits or underscores (e.g. "User_123")
+      - Reject anything whose first token is in person_denylist (e.g. "Cadence", "Optiv")
+    """
+    clean = text.strip()
+    if not clean:
+        return False
+    # Reject tokens containing digits or underscores
+    if any(ch.isdigit() or ch == "_" for ch in clean):
+        return False
+    words = clean.split()
+    # Reject single ALL-CAPS tokens
+    if len(words) == 1 and clean.isupper():
+        return False
+    # Reject anything whose first token is in denylist
+    first_token = words[0].strip(":-.,'\"").lower()
+    if first_token in denylist:
+        return False
+    return True
+
+
 def run_ner(text: str, config: dict) -> List[RawHit]:
     """
     Run Presidio NER on `text` and return RawHit objects.
@@ -76,6 +100,7 @@ def run_ner(text: str, config: dict) -> List[RawHit]:
     enabled: set = set(config.get("enabled_entities", []))
     profile_name = config.get("active_profile", "balanced")
     min_conf: float = config["profiles"][profile_name]["ner_confidence_threshold"]
+    denylist = {x.strip().lower() for x in config.get("person_denylist", [])}
 
     engine = _get_engine()
 
@@ -106,6 +131,10 @@ def run_ner(text: str, config: dict) -> List[RawHit]:
         raw_text = text[start: end]
 
         if our_type == "PERSON":
+            if not plausible_person(raw_text, denylist):
+                log.debug("Rejected non-plausible PERSON candidate: %s", raw_text)
+                continue
+
             from detect.context import _NAME_STOP_WORDS
             words = raw_text.split()
             valid_words = []
@@ -119,6 +148,9 @@ def run_ner(text: str, config: dict) -> List[RawHit]:
             trimmed_text = " ".join(valid_words)
             end = start + len(trimmed_text)
             raw_text = trimmed_text
+
+            if not plausible_person(raw_text, denylist):
+                continue
 
         hits.append(RawHit(
             entity_type=our_type,

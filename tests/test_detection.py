@@ -285,14 +285,22 @@ class TestEmailMultiTLD:
 
 
 class TestContextExpandedLabels:
-    def test_name_colon_pattern(self, config):
-        """'Name: John Smith' must produce a PERSON hit from context layer."""
+    def test_bare_name_denied_and_full_name_allowed(self, config):
+        """Bare 'Name: ...' must not trigger false positive PERSON from context layer; Full Name must."""
         location = "body"
-        text = "Name: John Smith"
-        hits = run_rules(text, config)
-        new_hits, _ = run_context(location, text, hits, config)
-        persons = [h for h in new_hits if h.entity_type == "PERSON"]
-        assert len(persons) >= 1, "'Name: John Smith' must be detected as PERSON"
+        # Deny case: bare "Name: Third Party" or "Name: Cadence Financial Services"
+        text_deny = "Name: Third Party"
+        hits_deny = run_rules(text_deny, config)
+        new_hits_deny, _ = run_context(location, text_deny, hits_deny, config)
+        persons_deny = [h for h in new_hits_deny if h.entity_type == "PERSON"]
+        assert len(persons_deny) == 0, f"Bare name should not be emitted: {persons_deny}"
+
+        # Allow case: "Full Name: Jane Doe"
+        text_allow = "Full Name: Jane Doe"
+        hits_allow = run_rules(text_allow, config)
+        new_hits_allow, _ = run_context(location, text_allow, hits_allow, config)
+        persons_allow = [h for h in new_hits_allow if h.entity_type == "PERSON"]
+        assert len(persons_allow) >= 1, "Full Name pattern must detect PERSON"
 
     def test_full_name_colon_pattern(self, config):
         """'Full Name: Jane Doe' must produce a PERSON hit from context layer."""
@@ -311,6 +319,34 @@ class TestContextExpandedLabels:
         new_hits, _ = run_context(location, text, hits, config)
         persons = [h for h in new_hits if h.entity_type == "PERSON"]
         assert any("Robert" in h.text for h in persons), "Employee Name pattern must detect PERSON"
+
+
+class TestPlausiblePerson:
+    def test_plausible_person_filtering(self, config):
+        from detect.ner import plausible_person
+
+        denylist = {x.lower() for x in config.get("person_denylist", [])}
+
+        # Allow cases
+        assert plausible_person("Alice Smith", denylist) is True
+        assert plausible_person("David Miller", denylist) is True
+        assert plausible_person("J. Doe", denylist) is True
+
+        # Deny cases: denylist companies / generic terms
+        assert plausible_person("Optiv", denylist) is False
+        assert plausible_person("Cadence", denylist) is False
+        assert plausible_person("Cadence Financial Services", denylist) is False
+        assert plausible_person("ServiceNow", denylist) is False
+        assert plausible_person("Workflow", denylist) is False
+
+        # Deny cases: all-caps acronyms
+        assert plausible_person("MFA", denylist) is False
+        assert plausible_person("BYOD", denylist) is False
+        assert plausible_person("SSO", denylist) is False
+
+        # Deny cases: digits or underscores
+        assert plausible_person("User_123", denylist) is False
+        assert plausible_person("Admin2", denylist) is False
 
 
 class TestIndiaPlusPhone:

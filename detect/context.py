@@ -50,7 +50,7 @@ _NAME_HEADER_KEYWORDS = re.compile(
 _LABEL_KEYS = (
     r"(?:prepared\s+by|approved\s+by|author(?:\(s\))?|owner|submitted\s+by|signed\s+by|"
     r"reviewer|peer\s+reviewer|qa\s+reviewer|client\s+contact|assignee|respondent|approver|"
-    r"user|member|members|full\s+name|employee\s+name|staff\s+name|name)"
+    r"user|member|members|full\s+name|employee\s+name|staff\s+name)"
 )
 
 # Initials-name pattern: e.g. "TJ Harlan", "PQ Lindqvist", "J. Doe", "A. B. Smith", "J Doe", "RK Patel"
