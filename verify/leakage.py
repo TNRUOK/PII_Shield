@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import List
 
 from extract.models import Chunk
@@ -26,10 +27,12 @@ _PLACEHOLDER_RE = re.compile(r"\[[A-Z_]+_\d+\]")
 
 def _strip_placeholders(text: str) -> str:
     """
-    Replace placeholder tokens with punctuation boundaries so NER tokenizers
-    cannot mistakenly bridge across redacted spans.
+    Replace placeholder tokens with a neutral block symbol so NER tokenizers
+    cannot mistakenly bridge across redacted spans or trigger false positives.
+    Uses '██' rather than ', ' to avoid creating comma patterns that could
+    falsely match date/phone/IP regexes.
     """
-    return _PLACEHOLDER_RE.sub(" , ", text)
+    return _PLACEHOLDER_RE.sub(" ██ ", text)
 
 
 @dataclass
@@ -70,28 +73,29 @@ def check_leakage(
 
     file_path = redacted_chunks[0].file
     leaks: List[Entity] = []
+    chunks_scanned = 0
 
     for chunk in redacted_chunks:
         if chunk.is_blocked():
             continue  # blocked chunks have no text — nothing to scan
 
+        chunks_scanned += 1
         # Strip placeholders before detection to avoid false alarm on placeholder text
         scan_text = _strip_placeholders(chunk.text)
 
-        entities = detect_chunk(
-            # Temporarily replace chunk text for scanning
-            type("_ScanChunk", (), {
-                "file": chunk.file,
-                "location": chunk.location,
-                "text": scan_text,
-                "method": chunk.method,
-                "ocr_confidence": chunk.ocr_confidence,
-                "order_index": chunk.order_index,
-                "blocked_reason": None,
-                "is_blocked": lambda self: False,
-            })(),
-            config,
+        # Use SimpleNamespace to avoid fragile anonymous-class construction
+        scan_chunk = SimpleNamespace(
+            file=chunk.file,
+            location=chunk.location,
+            text=scan_text,
+            method=chunk.method,
+            ocr_confidence=chunk.ocr_confidence,
+            order_index=chunk.order_index,
+            blocked_reason=None,
+            is_blocked=lambda: False,
         )
+
+        entities = detect_chunk(scan_chunk, config)
 
         if entities:
             for ent in entities:
@@ -100,6 +104,11 @@ def check_leakage(
                     file_path, chunk.location, ent.entity_type, ent.confidence
                 )
             leaks.extend(entities)
+
+    log.info(
+        "Leakage scan complete: %d chunks scanned, %d post-redaction entities found in %s",
+        chunks_scanned, len(leaks), file_path,
+    )
 
     result = LeakResult(
         file=file_path,
