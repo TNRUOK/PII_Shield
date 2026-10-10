@@ -1,7 +1,7 @@
 """
 extract/docx.py
 ---------------
-Extract text chunks from DOCX files using python-docx.
+Deep extraction of text chunks from DOCX files using python-docx and direct OpenXML parsing.
 
 Reading order:
   Walks document.element.body children in DOM order so paragraphs
@@ -9,20 +9,24 @@ Reading order:
 
 Covers:
   - Body paragraphs (headings, normal text)
-  - Tables (row/col coordinates, header-row detection)
-  - Headers and footers (from the first section)
-  - Footnotes
-  - Core properties (author, last_modified_by)
-  - Embedded raster images (PNG/JPEG) → OCR
-  - EMF/WMF/SVG: attempts PIL open; emits BLOCKED chunk if impossible
+  - Tables (with merged cell de-duplication, nested tables recursion, header detection)
+  - Headers and footers across all sections (primary, first_page, even_page + header tables)
+  - Text boxes (w:txbxContent elements)
+  - Tracked changes (w:del / w:delText and w:ins)
+  - Comments (word/comments.xml) and endnotes (word/endnotes.xml)
+  - Footnotes (word/footnotes.xml)
+  - Extended/custom properties (Company, Manager, custom properties) and core properties
+  - Embedded raster images (PNG/JPEG) with natural sorting → OCR
+  - Vector images (EMF/WMF/SVG) → BLOCKED chunks
 """
 from __future__ import annotations
 
 import io
 import logging
+import re
 import zipfile
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 from lxml import etree
 
 from docx import Document
@@ -37,6 +41,8 @@ log = logging.getLogger(__name__)
 
 # Word XML namespaces
 _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_EP = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+_CP = "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
 _REL_IMG = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 
 # If a table's first row contains any of these keywords we treat it as a header row
@@ -49,6 +55,11 @@ _HEADER_KEYWORDS = {
 }
 
 
+def _natural_key(s: str):
+    """Sort key for natural alphanumeric ordering (e.g. image2 before image10)."""
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+
+
 def _row_is_header(row) -> bool:
     """Heuristic: first row of a table is a header if any cell text matches header keywords."""
     for cell in row.cells:
@@ -57,14 +68,17 @@ def _row_is_header(row) -> bool:
     return False
 
 
-def _table_to_chunks(table: Table, file: str, table_idx: int,
-                     order_start: int, config: dict) -> List[Chunk]:
+def _table_to_chunks(
+    table: Table,
+    file: str,
+    table_idx: int,
+    order_start: int,
+    config: dict,
+    prefix: str = "table",
+) -> List[Chunk]:
     """
-    Render a DOCX table as Chunk objects.
-
-    Each row becomes one Chunk. The location encodes table index and
-    row number; the text is pipe-separated cell values with the header
-    context prepended (if detected) for context-aware detection.
+    Render a DOCX table as Chunk objects, including merged-cell de-duplication
+    and recursive handling of nested tables.
     """
     chunks: List[Chunk] = []
     order = order_start
@@ -83,17 +97,36 @@ def _table_to_chunks(table: Table, file: str, table_idx: int,
             for cell in row.cells
         )
         if has_tbl_header or (ri == 0 and _row_is_header(row)):
-            header_texts = [c.text.strip() for c in row.cells]
+            # Deduplicate merged cells for header
+            seen_tc_h: Set = set()
+            h_texts = []
+            for c in row.cells:
+                if c._tc not in seen_tc_h:
+                    seen_tc_h.add(c._tc)
+                    h_texts.append(c.text.strip())
+            header_texts = h_texts
             header_row_idx = ri
             break
 
+    nested_tables_found: List[tuple[int, int, Table]] = []
+
     for ri, row in enumerate(rows):
-        cell_texts = [c.text.strip() for c in row.cells]
+        seen_tc: Set = set()
+        cell_texts: List[str] = []
+        for cell in row.cells:
+            if cell._tc not in seen_tc:
+                seen_tc.add(cell._tc)
+                cell_texts.append(cell.text.strip())
+                # Check for nested tables inside this cell
+                nested = getattr(cell, "tables", None)
+                if nested:
+                    for n_idx, nested_tbl in enumerate(nested):
+                        nested_tables_found.append((ri, n_idx, nested_tbl))
+
         row_text = " | ".join(cell_texts)
-        is_header = ri == header_row_idx
 
         # Build location string including column context for context.py
-        location = f"table:{table_idx + 1}/r{ri + 1}"
+        location = f"{prefix}:{table_idx + 1}/r{ri + 1}"
         if header_texts:
             location += f"[headers: {' | '.join(header_texts)}]"
 
@@ -106,14 +139,24 @@ def _table_to_chunks(table: Table, file: str, table_idx: int,
             order_index=order,
         ))
         order += 1
+
+    # Recursively render nested tables
+    for n_ri, n_idx, n_tbl in nested_tables_found:
+        n_chunks = _table_to_chunks(
+            n_tbl, file, n_idx, order, config,
+            prefix=f"{prefix}:{table_idx + 1}/r{n_ri + 1}/nested"
+        )
+        chunks.extend(n_chunks)
+        order += len(n_chunks)
+
     return chunks
 
 
 def _extract_images(doc: Document, doc_path: str, file: str,
                     order_start: int, config: dict) -> List[Chunk]:
     """
-    Extract all embedded raster images from the DOCX zip and OCR them.
-    Returns Chunk objects with location="image:N".
+    Extract all embedded raster images from the DOCX zip and OCR them,
+    sorted with natural alphanumeric ordering (image2 before image10).
     """
     chunks: List[Chunk] = []
     order = order_start
@@ -130,7 +173,7 @@ def _extract_images(doc: Document, doc_path: str, file: str,
                 if n.startswith("word/media/") and
                 Path(n).suffix.lower() in raster_exts
             ]
-            for img_idx, img_name in enumerate(sorted(image_names)):
+            for img_idx, img_name in enumerate(sorted(image_names, key=_natural_key)):
                 raw = zf.read(img_name)
                 text, mean_conf = ocr_bytes(raw)
                 location = f"image:{img_idx + 1}"
@@ -167,7 +210,7 @@ def _extract_images(doc: Document, doc_path: str, file: str,
                 Path(n).suffix.lower() not in raster_exts and
                 Path(n).suffix.lower() in {".emf", ".wmf", ".svg"}
             ]
-            for img_name in non_raster:
+            for img_name in sorted(non_raster, key=_natural_key):
                 log.warning("Cannot OCR vector image %s → BLOCKED", img_name)
                 chunks.append(Chunk(
                     file=file,
@@ -192,7 +235,7 @@ def _paragraph_text(para: Paragraph) -> str:
 
 def extract_docx(file_path: str, config: dict) -> List[Chunk]:
     """
-    Extract all text chunks from a DOCX file.
+    Deep extraction of all text chunks from a DOCX file.
 
     Parameters
     ----------
@@ -232,24 +275,149 @@ def extract_docx(file_path: str, config: dict) -> List[Chunk]:
             ))
             order += 1
 
-    # --- Headers and footers (first section) ---
-    section = doc.sections[0]
-    for part_name, part in [
-        ("header", section.header),
-        ("footer", section.footer),
-    ]:
-        if part is not None:
-            text = "\n".join(p.text for p in part.paragraphs if p.text.strip())
-            if text.strip():
+    # --- Extended and Custom properties from zip (Company, Manager, custom fields) ---
+    try:
+        with zipfile.ZipFile(str(path), "r") as zf:
+            zf_names = set(zf.namelist())
+
+            if "docProps/app.xml" in zf_names:
+                try:
+                    app_root = etree.fromstring(zf.read("docProps/app.xml"))
+                    for elem_name in ("Company", "Manager"):
+                        found = app_root.find(f".//{{{_EP}}}{elem_name}")
+                        if found is None:
+                            found = app_root.find(f".//{elem_name}")
+                        if found is not None and found.text and found.text.strip():
+                            chunks.append(Chunk(
+                                file=file_path,
+                                location=f"metadata/{elem_name.lower()}",
+                                text=found.text.strip(),
+                                method="native",
+                                ocr_confidence=None,
+                                order_index=order,
+                            ))
+                            order += 1
+                except Exception as exc:
+                    log.debug("Could not parse docProps/app.xml: %s", exc)
+
+            if "docProps/custom.xml" in zf_names:
+                try:
+                    cust_root = etree.fromstring(zf.read("docProps/custom.xml"))
+                    for prop in cust_root.findall(f".//{{{_CP}}}property"):
+                        name = prop.get("name", "custom")
+                        val = "".join(prop.itertext()).strip()
+                        if val:
+                            chunks.append(Chunk(
+                                file=file_path,
+                                location=f"metadata/{name.lower()}",
+                                text=val,
+                                method="native",
+                                ocr_confidence=None,
+                                order_index=order,
+                            ))
+                            order += 1
+                except Exception as exc:
+                    log.debug("Could not parse docProps/custom.xml: %s", exc)
+
+            # Comments
+            if "word/comments.xml" in zf_names:
+                try:
+                    comm_root = etree.fromstring(zf.read("word/comments.xml"))
+                    for comm in comm_root.findall(f".//{{{_W}}}comment"):
+                        author = comm.get(f"{{{_W}}}author", "commenter")
+                        comm_texts = [t.text or "" for t in comm.iter(f"{{{_W}}}t")]
+                        comm_str = "".join(comm_texts).strip()
+                        if comm_str:
+                            chunks.append(Chunk(
+                                file=file_path,
+                                location=f"comment:{author}",
+                                text=comm_str,
+                                method="native",
+                                ocr_confidence=None,
+                                order_index=order,
+                            ))
+                            order += 1
+                except Exception as exc:
+                    log.debug("Could not parse word/comments.xml: %s", exc)
+
+            # Endnotes
+            if "word/endnotes.xml" in zf_names:
+                try:
+                    en_root = etree.fromstring(zf.read("word/endnotes.xml"))
+                    for en in en_root.findall(f".//{{{_W}}}endnote"):
+                        en_id = en.get(f"{{{_W}}}id", "0")
+                        try:
+                            if int(en_id) < 1:
+                                continue
+                        except ValueError:
+                            pass
+                        en_texts = [t.text or "" for t in en.iter(f"{{{_W}}}t")]
+                        en_str = "".join(en_texts).strip()
+                        if en_str:
+                            chunks.append(Chunk(
+                                file=file_path,
+                                location=f"endnote:{en_id}",
+                                text=en_str,
+                                method="native",
+                                ocr_confidence=None,
+                                order_index=order,
+                            ))
+                            order += 1
+                except Exception as exc:
+                    log.debug("Could not parse word/endnotes.xml: %s", exc)
+    except Exception as exc:
+        log.debug("Could not inspect zip for extra properties: %s", exc)
+
+    # --- Headers and footers across all sections ---
+    seen_hf: Set[str] = set()
+    for s_idx, sec in enumerate(doc.sections):
+        is_first_sec = (s_idx == 0)
+        hf_list = [
+            ("header" if is_first_sec else f"section:{s_idx+1}/header", getattr(sec, "header", None)),
+            ("footer" if is_first_sec else f"section:{s_idx+1}/footer", getattr(sec, "footer", None)),
+            ("first_page_header" if is_first_sec else f"section:{s_idx+1}/first_page_header", getattr(sec, "first_page_header", None)),
+            ("first_page_footer" if is_first_sec else f"section:{s_idx+1}/first_page_footer", getattr(sec, "first_page_footer", None)),
+            ("even_page_header" if is_first_sec else f"section:{s_idx+1}/even_page_header", getattr(sec, "even_page_header", None)),
+            ("even_page_footer" if is_first_sec else f"section:{s_idx+1}/even_page_footer", getattr(sec, "even_page_footer", None)),
+        ]
+        for loc_name, part in hf_list:
+            if part is None:
+                continue
+            # Header/footer paragraphs
+            p_text = "\n".join(p.text.strip() for p in getattr(part, "paragraphs", []) if p.text.strip())
+            if p_text and p_text not in seen_hf:
+                seen_hf.add(p_text)
                 chunks.append(Chunk(
                     file=file_path,
-                    location=part_name,
-                    text=text.strip(),
+                    location=loc_name,
+                    text=p_text,
                     method="native",
                     ocr_confidence=None,
                     order_index=order,
                 ))
                 order += 1
+
+            # Header/footer tables
+            for t_idx, tbl in enumerate(getattr(part, "tables", [])):
+                for r_idx, r in enumerate(tbl.rows):
+                    seen_c: Set = set()
+                    cell_vals = []
+                    for c in r.cells:
+                        if c._tc not in seen_c:
+                            seen_c.add(c._tc)
+                            cell_vals.append(c.text.strip())
+                    row_t = " | ".join(cell_vals)
+                    if row_t and row_t not in seen_hf:
+                        seen_hf.add(row_t)
+                        chunks.append(Chunk(
+                            file=file_path,
+                            location=f"{loc_name}/table:{t_idx+1}/r{r_idx+1}",
+                            text=row_t,
+                            method="native",
+                            ocr_confidence=None,
+                            order_index=order,
+                        ))
+                        order += 1
 
     # --- Body: paragraphs and tables in DOM order ---
     table_idx = 0
@@ -258,7 +426,6 @@ def extract_docx(file_path: str, config: dict) -> List[Chunk]:
         tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
 
         if tag == "p":
-            # Paragraph
             para = Paragraph(child, doc)
             text = _paragraph_text(para).strip()
             if text:
@@ -273,12 +440,52 @@ def extract_docx(file_path: str, config: dict) -> List[Chunk]:
                 order += 1
 
         elif tag == "tbl":
-            # Table
             table = Table(child, doc)
             table_chunks = _table_to_chunks(table, file_path, table_idx, order, config)
             chunks.extend(table_chunks)
             order += len(table_chunks)
             table_idx += 1
+
+    # --- Text boxes (w:txbxContent) in document body ---
+    txbx_idx = 0
+    for txbx in doc.element.body.iter(f"{{{_W}}}txbxContent"):
+        tb_texts = []
+        for p in txbx.iter(f"{{{_W}}}p"):
+            p_txt = "".join(t.text or "" for t in p.iter(f"{{{_W}}}t")).strip()
+            if p_txt:
+                tb_texts.append(p_txt)
+        if not tb_texts:
+            t_all = "".join(t.text or "" for t in txbx.iter(f"{{{_W}}}t")).strip()
+            if t_all:
+                tb_texts.append(t_all)
+        if tb_texts:
+            chunks.append(Chunk(
+                file=file_path,
+                location=f"textbox:{txbx_idx + 1}",
+                text="\n".join(tb_texts),
+                method="native",
+                ocr_confidence=None,
+                order_index=order,
+            ))
+            order += 1
+            txbx_idx += 1
+
+    # --- Tracked Changes (deletions via w:del / w:delText) ---
+    del_idx = 0
+    for del_elem in doc.element.body.iter(f"{{{_W}}}del"):
+        del_texts = [t.text or "" for t in del_elem.iter(f"{{{_W}}}delText")]
+        del_str = "".join(del_texts).strip()
+        if del_str:
+            chunks.append(Chunk(
+                file=file_path,
+                location=f"tracked_change:deleted/{del_idx + 1}",
+                text=del_str,
+                method="native",
+                ocr_confidence=None,
+                order_index=order,
+            ))
+            order += 1
+            del_idx += 1
 
     # --- Footnotes ---
     try:

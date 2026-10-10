@@ -103,6 +103,95 @@ class TestDOCXExtractor:
             assert hasattr(c, "location")
             assert hasattr(c, "method")
 
+    def test_docx_text_box_extraction(self, tmp_path, config):
+        """Text boxes in body (w:txbxContent) must be extracted with location=textbox:N."""
+        from docx import Document
+        from docx.oxml import OxmlElement
+        from extract.docx import extract_docx
+
+        doc = Document()
+        p = doc.add_paragraph("Main paragraph text")
+        r = p.add_run()
+        txbx = OxmlElement("w:txbxContent")
+        p_tb = OxmlElement("w:p")
+        r_tb = OxmlElement("w:r")
+        t_tb = OxmlElement("w:t")
+        t_tb.text = "Reviewer: Marcus Vance"
+        r_tb.append(t_tb)
+        p_tb.append(r_tb)
+        txbx.append(p_tb)
+        r._r.append(txbx)
+
+        doc_path = tmp_path / "test_tb.docx"
+        doc.save(str(doc_path))
+
+        chunks = extract_docx(str(doc_path), config)
+        assert any("Marcus Vance" in c.text for c in chunks)
+        assert any("textbox:" in c.location for c in chunks)
+
+    def test_docx_nested_tables(self, tmp_path, config):
+        """Nested tables within cells must be extracted with nested location path."""
+        from docx import Document
+        from extract.docx import extract_docx
+
+        doc = Document()
+        tbl = doc.add_table(rows=2, cols=2)
+        tbl.cell(0, 0).text = "Outer Col 1"
+        tbl.cell(0, 1).text = "Outer Col 2"
+        tbl.cell(1, 0).text = "Data Cell"
+
+        nested_tbl = tbl.cell(1, 1).add_table(rows=1, cols=2)
+        nested_tbl.cell(0, 0).text = "Nested Key"
+        nested_tbl.cell(0, 1).text = "Nested Value"
+
+        doc_path = tmp_path / "test_nested.docx"
+        doc.save(str(doc_path))
+
+        chunks = extract_docx(str(doc_path), config)
+        assert any("Nested Value" in c.text for c in chunks)
+        assert any("nested" in c.location for c in chunks)
+
+    def test_docx_tracked_changes_deletion(self, tmp_path, config):
+        """Tracked deletions (w:del / w:delText) must be extracted to prevent leaks."""
+        from docx import Document
+        from docx.oxml import OxmlElement
+        from extract.docx import extract_docx
+
+        doc = Document()
+        p = doc.add_paragraph("Normal text before deletion. ")
+        del_elem = OxmlElement("w:del")
+        del_text = OxmlElement("w:delText")
+        del_text.text = "Deleted Secret ID: 998-11-2233"
+        del_elem.append(del_text)
+        p._p.append(del_elem)
+
+        doc_path = tmp_path / "test_del.docx"
+        doc.save(str(doc_path))
+
+        chunks = extract_docx(str(doc_path), config)
+        assert any("Deleted Secret ID: 998-11-2233" in c.text for c in chunks)
+        assert any("tracked_change:" in c.location for c in chunks)
+
+    def test_docx_multi_section_headers(self, tmp_path, config):
+        """Headers across multiple sections must all be extracted."""
+        from docx import Document
+        from extract.docx import extract_docx
+
+        doc = Document()
+        sec1 = doc.sections[0]
+        sec1.header.paragraphs[0].text = "Header First Section"
+        sec2 = doc.add_section()
+        sec2.header.is_linked_to_previous = False
+        sec2.header.paragraphs[0].text = "Header Second Section"
+
+        doc_path = tmp_path / "test_multisec.docx"
+        doc.save(str(doc_path))
+
+        chunks = extract_docx(str(doc_path), config)
+        assert any("Header First Section" in c.text for c in chunks)
+        assert any("Header Second Section" in c.text for c in chunks)
+
+
 
 class TestPPTXExtractor:
     def test_returns_chunks(self, pptx_chunks):
