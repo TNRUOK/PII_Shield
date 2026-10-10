@@ -23,13 +23,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleRequest(request) {
   switch (request.type) {
     case "CHECK_HEALTH": {
-      const res = await fetchWithTimeout(`${BRIDGE_URL}/health`, { method: "GET" }, 4000);
+      const res = await fetchWithRetry(`${BRIDGE_URL}/health`, { method: "GET" }, 4000);
       if (!res.ok) throw new Error(`Bridge returned HTTP ${res.status}`);
       return await res.json();
     }
 
     case "REDACT_TEXT": {
-      const res = await fetchWithTimeout(
+      const res = await fetchWithRetry(
         `${BRIDGE_URL}/redact_text`,
         {
           method: "POST",
@@ -47,7 +47,7 @@ async function handleRequest(request) {
     }
 
     case "RESTORE_TEXT": {
-      const res = await fetchWithTimeout(
+      const res = await fetchWithRetry(
         `${BRIDGE_URL}/restore_text`,
         {
           method: "POST",
@@ -78,7 +78,7 @@ async function handleRequest(request) {
       }
       formData.append("profile", request.profile || "balanced");
 
-      const res = await fetchWithTimeout(
+      const res = await fetchWithRetry(
         `${BRIDGE_URL}/redact_file`,
         {
           method: "POST",
@@ -91,7 +91,6 @@ async function handleRequest(request) {
     }
 
     default:
-
       throw new Error(`Unknown message type: ${request.type}`);
   }
 }
@@ -110,4 +109,34 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     }
     throw new Error("Cannot reach PII Shield local bridge. Ensure 'python extension_server/server.py' is running.");
   }
+}
+
+/**
+ * fetchWithRetry: wraps fetchWithTimeout with up to 2 retries (3 total attempts)
+ * and 500ms exponential backoff on non-network errors (server 5xx).
+ */
+async function fetchWithRetry(url, options = {}, timeoutMs = 8000, maxRetries = 2) {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, options, timeoutMs);
+      // Only retry on 5xx server errors, not 4xx client errors
+      if (res.status >= 500 && attempt < maxRetries) {
+        lastErr = new Error(`Bridge returned HTTP ${res.status}`);
+        await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      // Don't retry timeout or network errors — they'll likely fail again immediately
+      if (err.message.includes("timed out") || err.message.includes("Cannot reach")) {
+        throw err;
+      }
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+      }
+    }
+  }
+  throw lastErr;
 }

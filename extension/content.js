@@ -168,20 +168,23 @@ function setElementText(el, text) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   } else {
-    // Contenteditable: Use Selection API + execCommand to update ProseMirror / Lexical
+    // Contenteditable: select all existing content first, then replace atomically.
+    // This prevents partial replacement bugs in ProseMirror / Lexical editors.
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
     let executed = false;
     try {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      selection.removeAllRanges();
-      selection.addRange(range);
       executed = document.execCommand("insertText", false, text);
     } catch (e) {
       executed = false;
     }
 
     if (!executed) {
+      // execCommand is deprecated — fall back to direct assignment + synthetic event
       el.innerText = text;
       el.dispatchEvent(
         new InputEvent("input", {
@@ -462,8 +465,31 @@ function scanForPlaceholdersToRestore() {
   });
 }
 
-// Initialize and keep widget present across SPA navigation
-setInterval(() => {
-  injectFloatingWidget();
-  scanForPlaceholdersToRestore();
-}, 1500);
+// Initialize widget immediately on load
+injectFloatingWidget();
+scanForPlaceholdersToRestore();
+
+// Keep widget present across SPA navigation with a lightweight interval
+// (only injects if widget was removed — cheap DOM id check)
+setInterval(injectFloatingWidget, 2000);
+
+// Replace polling for placeholder restoration with a MutationObserver.
+// This fires only when new DOM nodes are added (zero cost on idle pages)
+// rather than scanning the entire DOM every 1.5 seconds.
+const _piiObserver = new MutationObserver((mutations) => {
+  let hasNewNodes = false;
+  for (const m of mutations) {
+    if (m.addedNodes.length > 0) {
+      hasNewNodes = true;
+      break;
+    }
+  }
+  if (hasNewNodes) {
+    scanForPlaceholdersToRestore();
+  }
+});
+
+_piiObserver.observe(document.body, {
+  childList: true,
+  subtree: true,
+});
