@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Callable, Dict, Tuple
 
 from extract.models import Chunk
+from extract.ocr import ocr_image, is_tesseract_available
 
 log = logging.getLogger(__name__)
 
@@ -120,17 +121,26 @@ def route(file_path: str, config: dict) -> List[Chunk]:
     elif fmt == "image":
         # Single image file: OCR directly
         from PIL import Image
-        from extract.ocr import ocr_image
         profile_name = config.get("active_profile", "balanced")
         ocr_min_conf = config["profiles"][profile_name]["ocr_min_confidence"]
         try:
             img = Image.open(str(path))
-            text, mean_conf = ocr_image(img, min_confidence=ocr_min_conf)
-            if mean_conf < ocr_min_conf or not text.strip():
-                return _blocked(
-                    file_path,
-                    f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}",
-                )
+            text, mean_conf = ocr_image(img, min_confidence=ocr_min_conf, config=config)
+            if not is_tesseract_available():
+                return _blocked(file_path, "Tesseract not installed")
+            if not text.strip() and mean_conf == 0.0:
+                return _blocked(file_path, "no text detected")
+            if mean_conf < ocr_min_conf:
+                return [Chunk(
+                    file=file_path,
+                    location="page:1",
+                    text=text,
+                    method="blocked",
+                    ocr_confidence=mean_conf,
+                    order_index=0,
+                    blocked_reason=f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}",
+                    low_confidence=True,
+                )]
             return [Chunk(
                 file=file_path,
                 location="page:1",

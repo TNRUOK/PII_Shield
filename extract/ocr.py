@@ -126,6 +126,31 @@ def preprocess(img: Image.Image) -> np.ndarray:
     return binary
 
 
+def preprocess_adaptive(img: Image.Image) -> np.ndarray:
+    """Preprocess image with adaptive Gaussian thresholding (for low-contrast scans)."""
+    img = _upsample_if_small(img, min_dim=1800)
+    arr = pil_to_cv2(img)
+    gray = cv2.cvtColor(arr, cv2.COLOR_BGR2GRAY)
+    gray = _deskew(gray)
+    binary = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 35, 11
+    )
+    return binary
+
+
+def _reconstruct_text(valid: "pd.DataFrame") -> str:
+    """Preserve line structure by grouping words by (block_num, par_num, line_num)."""
+    if valid.empty:
+        return ""
+    lines = []
+    sorted_df = valid.sort_values(by=["block_num", "par_num", "line_num", "word_num"])
+    for _, line_group in sorted_df.groupby(["block_num", "par_num", "line_num"], sort=False):
+        words = [w for w in line_group["text"].dropna().astype(str) if w.strip()]
+        if words:
+            lines.append(" ".join(words))
+    return "\n".join(lines)
+
+
 def is_tesseract_available() -> bool:
     """Check if Tesseract executable is found on PATH or at standard Windows paths."""
     cmd = getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract")
@@ -136,6 +161,7 @@ def ocr_image(
     img: Image.Image,
     lang: str = "eng",
     min_confidence: float = 40.0,
+    config: Optional[dict] = None,
 ) -> Tuple[str, float]:
     """
     Run Tesseract on a (possibly preprocessed) PIL image.
@@ -143,7 +169,7 @@ def ocr_image(
     Returns
     -------
     (text, mean_confidence)
-        text             : The recognised text (empty string if below threshold).
+        text             : The recognised text preserving line structure (\n).
         mean_confidence  : Mean per-word confidence from image_to_data (0–100).
                            Returns 0.0 if no words recognised.
 
@@ -155,61 +181,71 @@ def ocr_image(
         log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
         return "", 0.0
 
-    preprocessed = preprocess(img)
-    pil_preprocessed = cv2_to_pil(preprocessed)
+    psm_primary = config.get("ocr_psm", 6) if config else 6
+    oem = config.get("ocr_oem", 3) if config else 3
 
-    def _run_tesseract(pil_img: Image.Image, psm: int) -> "pd.DataFrame | None":
-        """Run tesseract with LSTM engine and given PSM; return dataframe or None."""
-        tess_config = f"--oem 3 --psm {psm}"
+    preprocessed_otsu = preprocess(img)
+    pil_otsu = cv2_to_pil(preprocessed_otsu)
+
+    def _run_tesseract(pil_img: Image.Image, psm: int) -> Tuple[str, float]:
+        tess_config = f"--oem {oem} --psm {psm}"
         try:
-            return pytesseract.image_to_data(
+            data = pytesseract.image_to_data(
                 pil_img,
                 lang=lang,
                 config=tess_config,
                 output_type=Output.DATAFRAME,
             )
+            if data is None or data.empty:
+                return "", 0.0
+            valid = data[data["conf"] > 0].copy()
+            if valid.empty:
+                return "", 0.0
+            conf = float(valid["conf"].mean())
+            text = _reconstruct_text(valid)
+            return text, conf
         except pytesseract.TesseractNotFoundError:
             log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
-            return None
+            return "", 0.0
         except Exception as exc:
             log.error("Tesseract execution failed (psm=%d): %s", psm, exc)
-            return None
+            return "", 0.0
 
-    # Primary attempt: PSM 6 — assume uniform block of text (best for documents)
-    data = _run_tesseract(pil_preprocessed, psm=6)
-    if data is None:
-        return "", 0.0
+    # Primary attempt: psm_primary with Otsu
+    best_text, best_conf = _run_tesseract(pil_otsu, psm=psm_primary)
 
-    valid = data[data["conf"] > 0].copy()
-    mean_conf = float(valid["conf"].mean()) if not valid.empty else 0.0
+    # Fallback 1: If below min_confidence or empty, try PSM 4 (single column variable sizes)
+    if best_conf < min_confidence or not best_text.strip():
+        text_psm4, conf_psm4 = _run_tesseract(pil_otsu, psm=4)
+        if conf_psm4 > best_conf or (not best_text.strip() and text_psm4.strip()):
+            log.info("PSM-4 retry improved confidence: %.1f → %.1f", best_conf, conf_psm4)
+            best_text, best_conf = text_psm4, conf_psm4
 
-    # Fallback: PSM 3 (fully automatic) when primary confidence is very low
-    if mean_conf < 50 or valid.empty:
-        log.info(
-            "OCR PSM-6 low confidence (%.1f). Retrying with PSM-3 (auto page segmentation)...",
-            mean_conf,
-        )
-        data2 = _run_tesseract(pil_preprocessed, psm=3)
-        if data2 is not None:
-            valid2 = data2[data2["conf"] > 0].copy()
-            mean_conf2 = float(valid2["conf"].mean()) if not valid2.empty else 0.0
-            if mean_conf2 > mean_conf:
-                log.info("PSM-3 retry improved confidence: %.1f → %.1f", mean_conf, mean_conf2)
-                valid = valid2
-                mean_conf = mean_conf2
+    # Fallback 2: If still below min_confidence, try PSM 11 (sparse text)
+    if best_conf < min_confidence or not best_text.strip():
+        text_psm11, conf_psm11 = _run_tesseract(pil_otsu, psm=11)
+        if conf_psm11 > best_conf or (not best_text.strip() and text_psm11.strip()):
+            log.info("PSM-11 retry improved confidence: %.1f → %.1f", best_conf, conf_psm11)
+            best_text, best_conf = text_psm11, conf_psm11
 
-    if valid.empty:
+    # Fallback 3: If still below min_confidence, try adaptive thresholding
+    if best_conf < min_confidence or not best_text.strip():
+        preprocessed_adapt = preprocess_adaptive(img)
+        pil_adapt = cv2_to_pil(preprocessed_adapt)
+        text_adapt, conf_adapt = _run_tesseract(pil_adapt, psm=psm_primary)
+        if conf_adapt > best_conf or (not best_text.strip() and text_adapt.strip()):
+            log.info("Adaptive threshold retry improved confidence: %.1f → %.1f", best_conf, conf_adapt)
+            best_text, best_conf = text_adapt, conf_adapt
+
+    if not best_text.strip():
         log.warning(
             "Tesseract returned no words with positive confidence (image size: %s)",
             img.size,
         )
         return "", 0.0
 
-    words = valid["text"].dropna().astype(str).tolist()
-    text = " ".join(w for w in words if w.strip())
-
-    log.debug("OCR: %d words, mean_conf=%.1f", len(words), mean_conf)
-    return text, mean_conf
+    log.debug("OCR: %d characters, mean_conf=%.1f", len(best_text), best_conf)
+    return best_text, best_conf
 
 
 def ocr_bytes(
@@ -217,6 +253,7 @@ def ocr_bytes(
     fmt: str = "PNG",
     lang: str = "eng",
     min_confidence: float = 40.0,
+    config: Optional[dict] = None,
 ) -> Tuple[str, float]:
     """
     Convenience wrapper: accepts raw image bytes, returns (text, mean_confidence).
@@ -227,4 +264,4 @@ def ocr_bytes(
     except Exception as exc:
         log.error("Cannot open image bytes: %s", exc)
         return "", 0.0
-    return ocr_image(img, lang=lang, min_confidence=min_confidence)
+    return ocr_image(img, lang=lang, min_confidence=min_confidence, config=config)

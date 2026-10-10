@@ -164,3 +164,69 @@ class TestDeskew:
         clean_ocr = " ".join(ocr_text.split())
         ratio = difflib.SequenceMatcher(None, clean_ocr.lower(), gt_text.lower()).ratio()
         assert ratio >= 0.95, f"Deskew failed at {angle} deg: ratio={ratio:.4f}"
+
+
+class TestOCRPipeline:
+    def test_line_breaks_preserved(self):
+        from PIL import Image, ImageDraw, ImageFont
+        from extract.ocr import ocr_image, is_tesseract_available
+
+        if not is_tesseract_available():
+            pytest.skip("Tesseract is not available")
+
+        lines = [
+            "First Line Header",
+            "Second Line Department",
+            "Third Line Location",
+            "Fourth Line Employee",
+            "Fifth Line Timestamp",
+        ]
+        img = Image.new("RGB", (900, 400), (255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 24)
+        except OSError:
+            font = ImageFont.load_default()
+
+        y = 30
+        for line in lines:
+            draw.text((40, y), line, fill=(0, 0, 0), font=font)
+            y += 60
+
+        ocr_text, conf = ocr_image(img)
+        assert conf > 50
+        extracted_lines = [l.strip() for l in ocr_text.strip().split("\n") if l.strip()]
+        assert len(extracted_lines) == 5, f"Expected 5 lines, got {len(extracted_lines)}: {repr(ocr_text)}"
+
+    def test_explicit_blocked_reasons(self, tmp_path, config):
+        from PIL import Image
+        from unittest.mock import patch
+        from extract.router import route
+        from extract.ocr import is_tesseract_available
+
+        cfg = config
+
+        # 1. Blank image -> "no text detected"
+        blank = Image.new("RGB", (200, 200), (255, 255, 255))
+        blank_p = tmp_path / "blank.png"
+        blank.save(str(blank_p))
+        chunks = route(str(blank_p), cfg)
+        assert len(chunks) == 1
+        assert chunks[0].is_blocked()
+        assert chunks[0].blocked_reason == "no text detected"
+
+        # 2. Mock Tesseract not installed -> "Tesseract not installed"
+        with patch("extract.router.is_tesseract_available", return_value=False):
+            chunks = route(str(blank_p), cfg)
+            assert len(chunks) == 1
+            assert chunks[0].is_blocked()
+            assert chunks[0].blocked_reason == "Tesseract not installed"
+
+        # 3. Sub-threshold OCR text -> low_confidence=True and blocked_reason has "below threshold"
+        with patch("extract.router.ocr_image", return_value=("Some faint noisy text", 25.0)):
+            chunks = route(str(blank_p), cfg)
+            assert len(chunks) == 1
+            assert chunks[0].is_blocked()
+            assert chunks[0].low_confidence is True
+            assert "below threshold" in chunks[0].blocked_reason
+            assert chunks[0].text == "Some faint noisy text"

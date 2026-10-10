@@ -34,6 +34,7 @@ if str(_ROOT) not in sys.path:
 
 from extract.router import route
 from extract.models import Chunk
+from extract.ocr import is_tesseract_available
 from detect.merge import detect_chunk, Entity
 from redact.mapping import PlaceholderMapping
 from redact.redactor import redact_chunks
@@ -163,7 +164,11 @@ def process_files(
     pii_df        = _entities_to_df(all_entities)
 
     # Build report summary text
-    summary_lines = ["## PII Shield — Run Summary\n"]
+    tess_status = "✅ Installed" if is_tesseract_available() else "⚠️ Not Installed"
+    summary_lines = [
+        "## PII Shield — Run Summary\n",
+        f"OCR Engine (Tesseract): **{tess_status}**\n",
+    ]
     for fs in file_summaries:
         safe = "✅ YES" if fs["leak_check"]["downstream_safe"] else "❌ NO"
         summary_lines.append(
@@ -193,6 +198,7 @@ def process_files(
 # ---------------------------------------------------------------------------
 
 def build_ui() -> gr.Blocks:
+    tess_status = "✅ Installed" if is_tesseract_available() else "⚠️ Not Installed"
     with gr.Blocks(
         title="PII Shield — Local Privacy Pipeline",
         theme=gr.themes.Soft(),
@@ -202,10 +208,11 @@ def build_ui() -> gr.Blocks:
         """,
     ) as demo:
         gr.Markdown(
-            "# 🛡️ PII Shield\n"
-            "**Local, privacy-preserving PII detection and redaction.** "
-            "No data leaves your machine. No LLM calls for detection.\n"
-            "> ⚠️ Upload only **synthetic or non-sensitive test documents**."
+            f"# 🛡️ PII Shield\n"
+            f"**Local, privacy-preserving PII detection and redaction.** "
+            f"OCR Engine (Tesseract): **{tess_status}**. "
+            f"No data leaves your machine. No LLM calls for detection.\n"
+            f"> ⚠️ Upload only **synthetic or non-sensitive test documents**."
         )
 
         with gr.Row():

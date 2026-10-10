@@ -33,6 +33,7 @@ class Chunk:
     ocr_confidence: Optional[float]
     order_index: int
     blocked_reason: Optional[str] = None
+    low_confidence: bool = False
 
     def is_blocked(self) -> bool:
         return self.method == "blocked"

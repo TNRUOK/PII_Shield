@@ -20,7 +20,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 
 from extract.models import Chunk
-from extract.ocr import ocr_image
+from extract.ocr import ocr_image, is_tesseract_available
 
 log = logging.getLogger(__name__)
 
@@ -128,7 +128,9 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                      page_num + 1, path.name, len(native_text))
             try:
                 pil_img = _render_page(page, dpi=OCR_RENDER_DPI)
-                ocr_text, mean_conf = ocr_image(pil_img, min_confidence=ocr_min_conf)
+                ocr_text, mean_conf = ocr_image(
+                    pil_img, min_confidence=ocr_min_conf, config=config
+                )
             except Exception as exc:
                 log.error("OCR failed on page %d of %s: %s", page_num + 1, path.name, exc)
                 chunks.append(Chunk(
@@ -143,17 +145,38 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                 order += 1
                 continue
 
-            if mean_conf < ocr_min_conf or not ocr_text.strip():
-                log.warning("Page %d of %s: OCR confidence %.1f < %.1f → BLOCKED",
-                            page_num + 1, path.name, mean_conf, ocr_min_conf)
+            if not is_tesseract_available():
                 chunks.append(Chunk(
                     file=file_path,
                     location=location,
                     text="",
                     method="blocked",
+                    ocr_confidence=0.0,
+                    order_index=order,
+                    blocked_reason="Tesseract not installed",
+                ))
+            elif not ocr_text.strip() and mean_conf == 0.0:
+                chunks.append(Chunk(
+                    file=file_path,
+                    location=location,
+                    text="",
+                    method="blocked",
+                    ocr_confidence=0.0,
+                    order_index=order,
+                    blocked_reason="no text detected",
+                ))
+            elif mean_conf < ocr_min_conf:
+                log.warning("Page %d of %s: OCR confidence %.1f < %.1f → BLOCKED",
+                            page_num + 1, path.name, mean_conf, ocr_min_conf)
+                chunks.append(Chunk(
+                    file=file_path,
+                    location=location,
+                    text=ocr_text,
+                    method="blocked",
                     ocr_confidence=mean_conf,
                     order_index=order,
                     blocked_reason=f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}",
+                    low_confidence=True,
                 ))
             else:
                 chunks.append(Chunk(

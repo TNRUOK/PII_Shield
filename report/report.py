@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from extract.models import Chunk
+from extract.ocr import is_tesseract_available
 from detect.merge import Entity
 from verify.leakage import LeakResult
 
@@ -130,6 +131,7 @@ def generate_report(
     # --- JSON ---
     report_data = {
         "generated_at": ts,
+        "tesseract_available": is_tesseract_available(),
         "WARNING": "This report contains masked PII values only. Raw values are in separate _mapping.json files.",
         "file_summaries": file_summaries,
         "entities": entity_rows,
@@ -145,6 +147,8 @@ def print_summary_table(file_summaries: List[Dict[str, Any]]) -> str:
     """Return a human-readable summary table as a string."""
     lines = []
     lines.append("\n" + "=" * 90)
+    lines.append(f"OCR Engine (Tesseract): {'Available' if is_tesseract_available() else 'Not Installed'}")
+    lines.append("-" * 90)
     lines.append(f"{'File':<30} {'Chunks':>7} {'Blk':>4} {'PII':>5} {'Risk':<8} {'Struct':>7} {'Safe?':<6}")
     lines.append("-" * 90)
     for fs in file_summaries:
