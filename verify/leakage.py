@@ -187,10 +187,19 @@ def check_leakage(
                 if ent.masked_value not in residue_set:
                     residue_set.append(ent.masked_value)
 
-        # 2. Known-value propagation: exact case-insensitive substring search for known raw PII
+        # 2. Known-value propagation: exact case-insensitive search for known raw PII
         for known_val in known_set:
             val_lower = known_val.lower()
-            pattern = re.compile(re.escape(val_lower), re.IGNORECASE)
+            ent_type = raw_to_type.get(val_lower, "KNOWN_PII")
+            # If single-word PERSON name, require word boundary and title/exact case
+            # to prevent matching common nouns (e.g. 'glass', 'page', 'may') in other chunks
+            if ent_type == "PERSON" and len(known_val.split()) == 1:
+                pattern = re.compile(rf"\b{re.escape(known_val)}\b")
+            elif any(c.isalnum() for c in known_val):
+                pattern = re.compile(rf"\b{re.escape(known_val)}\b", re.IGNORECASE)
+            else:
+                pattern = re.compile(re.escape(known_val), re.IGNORECASE)
+
             for m in pattern.finditer(scan_text):
                 m_span = (m.start(), m.end())
                 # Check if already covered by an existing leak entity
