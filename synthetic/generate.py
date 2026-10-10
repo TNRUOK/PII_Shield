@@ -430,7 +430,9 @@ def generate_training_docx() -> None:
     gt_text_lines.append("3. Compliance Requirements")
 
     for i in range(10):
-        doc.add_paragraph(fake.paragraph(nb_sentences=5))
+        filler_p = fake.paragraph(nb_sentences=5)
+        doc.add_paragraph(filler_p)
+        gt_text_lines.append(filler_p)
 
     # --- Tricky: name split across runs (same paragraph, different runs) ---
     split_first = fake.first_name()
@@ -456,7 +458,9 @@ def generate_training_docx() -> None:
 
     # More filler
     for i in range(15):
-        doc.add_paragraph(fake.paragraph(nb_sentences=4))
+        filler_p = fake.paragraph(nb_sentences=4)
+        doc.add_paragraph(filler_p)
+        gt_text_lines.append(filler_p)
 
     doc.add_heading("4. IT Security", 1)
     gt_text_lines.append("4. IT Security")
@@ -490,7 +494,9 @@ def generate_training_docx() -> None:
 
     # More filler
     for i in range(15):
-        doc.add_paragraph(fake.paragraph(nb_sentences=4))
+        filler_p = fake.paragraph(nb_sentences=4)
+        doc.add_paragraph(filler_p)
+        gt_text_lines.append(filler_p)
 
     # --- Footnote ---
     # python-docx does not have a built-in footnote API; we patch via XML
