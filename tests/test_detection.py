@@ -419,14 +419,14 @@ class TestContextInitialsAndTables:
             assert len(persons) >= 1, f"Failed to detect person in key-value row: {row_text}"
 
     def test_acronym_not_flagged_in_normal_paragraph(self, config):
-        """Acronyms in normal paragraphs must NOT be flagged as PERSON."""
+        """Acronyms and software names in normal paragraphs must NOT be flagged as PERSON."""
         from extract.models import Chunk
         from detect.merge import detect_chunk
 
         chunk = Chunk(
             file="test.docx",
             location="body",
-            text="All employees must follow the BYOD Allowed policy and use MFA for SSO logins.",
+            text="All employees must follow the BYOD Allowed policy and use MFA when Launching ServPro for SSO logins.",
             method="native",
             ocr_confidence=None,
             order_index=0,
@@ -435,5 +435,179 @@ class TestContextInitialsAndTables:
         person_names = [e.raw_value for e in entities if e.entity_type == "PERSON"]
         assert not any("BYOD" in n for n in person_names), f"BYOD incorrectly flagged: {person_names}"
         assert not any("MFA" in n for n in person_names), f"MFA incorrectly flagged: {person_names}"
+        assert not any("Launching" in n or "ServPro" in n for n in person_names), f"Launching ServPro incorrectly flagged: {person_names}"
+
+
+class TestGroupColumnExclusion:
+    """Issue 1: Group-name and organizational structure columns must NOT be flagged as PERSON."""
+
+    def test_user_groups_table_exclusion(self, config):
+        """USER GROUPS | DESCRIPTION | PERMISSIONS | USERS table."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        headers = "USER GROUPS | DESCRIPTION | PERMISSIONS | USERS"
+        rows = [
+            ("table:1/r1[headers: " + headers + "]", "Vendor Risk Management Group | External auditors | ReadOnly | TJ Harlan"),
+            ("table:1/r2[headers: " + headers + "]", "Security Group | Core SecOps | Admin | PQ Lindqvist"),
+        ]
+
+        for loc, row_text in rows:
+            chunk = Chunk(
+                file="test.docx",
+                location=loc,
+                text=row_text,
+                method="native",
+                ocr_confidence=None,
+                order_index=0,
+            )
+            entities = detect_chunk(chunk, config)
+            person_names = [e.raw_value for e in entities if e.entity_type == "PERSON"]
+
+            # Group names must NOT be flagged as PERSON
+            assert not any("Vendor Risk" in n or "Management Group" in n for n in person_names), f"Group name wrongly flagged: {person_names}"
+            assert not any("Security Group" in n for n in person_names), f"Group name wrongly flagged: {person_names}"
+
+            # User column names MUST be flagged
+            if "TJ Harlan" in row_text:
+                assert any("TJ Harlan" in n for n in person_names), f"TJ Harlan missed: {person_names}"
+            if "PQ Lindqvist" in row_text:
+                assert any("PQ Lindqvist" in n for n in person_names), f"PQ Lindqvist missed: {person_names}"
+
+    def test_team_and_reviewer_columns(self, config):
+        """TEAM | REVIEWER table: Team name NOT flagged, Reviewer IS flagged."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        headers = "TEAM | REVIEWER"
+        chunk = Chunk(
+            file="test.docx",
+            location=f"table:1/r1[headers: {headers}]",
+            text="Core Infrastructure Team | RK Patel",
+            method="native",
+            ocr_confidence=None,
+            order_index=0,
+        )
+        entities = detect_chunk(chunk, config)
+        person_names = [e.raw_value for e in entities if e.entity_type == "PERSON"]
+        assert not any("Team" in n or "Infrastructure" in n for n in person_names), f"Team column flagged: {person_names}"
+        assert any("RK Patel" in n for n in person_names), f"Reviewer RK Patel missed: {person_names}"
+
+    def test_key_value_labels_author_reviewer_contact(self, config):
+        """Key-value tables with Author(s), Client Contact, Peer Reviewer must flag values."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        kv_rows = [
+            ("table:3/r1", "Author(s) | Sarah Jenkins"),
+            ("table:3/r2", "Peer Reviewer | Marcus Vance"),
+            ("table:3/r3", "Client Contact | Helena Troy"),
+        ]
+        for loc, row_text in kv_rows:
+            chunk = Chunk(
+                file="test.docx",
+                location=loc,
+                text=row_text,
+                method="native",
+                ocr_confidence=None,
+                order_index=0,
+            )
+            entities = detect_chunk(chunk, config)
+            person_names = [e.raw_value for e in entities if e.entity_type == "PERSON"]
+            assert len(person_names) >= 1, f"Expected person detection for {row_text}, got {person_names}"
+
+
+class TestIssue3Rules:
+    """Issue 3: IP address, phone variants, and OCR email rules."""
+
+    def test_labelled_ipv4_extracted_cleanly(self, config):
+        """Labelled IPv4 must extract ONLY the numeric IP without label prefix."""
+        from detect.rules import run_rules
+
+        text = "Workstation IP: 10.46.59.64 and Server Host: 192.168.1.100"
+        hits = run_rules(text, config)
+        ip_hits = [h for h in hits if h.entity_type == "IP_ADDRESS"]
+        assert len(ip_hits) >= 2
+        for h in ip_hits:
+            assert not h.text.lower().startswith("workstation")
+            assert not h.text.lower().startswith("server")
+            assert not h.text.lower().startswith("ip")
+            assert not h.text.lower().startswith("host")
+
+    def test_ipv6_full_and_compressed(self, config):
+        """Support both full 8-group and compressed :: IPv6 addresses."""
+        from detect.rules import run_rules
+
+        text = "Primary DNS: 2001:0db8:85a3:0000:0000:8a2e:0370:7334, Loopback: ::1, Link-local: fe80::1"
+        hits = run_rules(text, config)
+        ip_hits = [h for h in hits if h.entity_type == "IP_ADDRESS"]
+        ip_texts = [h.text for h in ip_hits]
+        assert any("2001:0db8:85a3:0000:0000:8a2e:0370:7334" in t for t in ip_texts)
+        assert any("::1" in t for t in ip_texts)
+        assert any("fe80::1" in t for t in ip_texts)
+
+    def test_phone_variants(self, config):
+        """Cover 10 contiguous digits, extension formats, and international Indian."""
+        from detect.rules import run_rules
+
+        # 10 contiguous digits
+        hits = run_rules("Direct call line: 4522327928 for customer support.", config)
+        phones = [h for h in hits if h.entity_type == "PHONE"]
+        assert any("4522327928" in h.text for h in phones)
+
+        # US with extension
+        hits2 = run_rules("Office line: 555.010.1234 x45 or (555) 010-1234 ext 12.", config)
+        phones2 = [h for h in hits2 if h.entity_type == "PHONE"]
+        assert len(phones2) >= 2
+
+        # Indian with spaces
+        hits3 = run_rules("Support in India: +91 98765 43210 available 24/7.", config)
+        phones3 = [h for h in hits3 if h.entity_type == "PHONE"]
+        assert any("98765 43210" in h.text or "9876543210" in h.text for h in phones3)
+
+    def test_ocr_tolerant_email(self, config):
+        """OCR-tolerant email rule triggers on OCR chunks but not on native."""
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        ocr_chunk = Chunk(
+            file="test.pdf",
+            location="page:1",
+            text="Inquiries: compliance (at) cadencefinancial [dot] com",
+            method="ocr",
+            ocr_confidence=75.0,
+            order_index=0,
+        )
+        entities = detect_chunk(ocr_chunk, config)
+        emails = [e for e in entities if e.entity_type == "EMAIL"]
+        assert len(emails) >= 1
+
+
+class TestPrecisionGuards:
+    """Guard precision: ensure non-PII look-alikes are NEVER flagged."""
+
+    def test_look_alikes_not_flagged(self, config):
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+
+        text = (
+            "Document version 4.31.2 was published on 12/05/2026. "
+            "Refer to ProductID: PRD-20240115 and Section 2.4.1 under "
+            "internal tracking code QRC_Sec_4.31. Case REF-9876543210123."
+        )
+        chunk = Chunk(
+            file="test.docx",
+            location="body",
+            text=text,
+            method="native",
+            ocr_confidence=None,
+            order_index=0,
+        )
+        entities = detect_chunk(chunk, config)
+        for e in entities:
+            assert e.raw_value not in ["4.31.2", "12/05/2026", "PRD-20240115", "2.4.1", "QRC_Sec_4.31"]
+            assert e.entity_type != "IP_ADDRESS", f"False positive IP detected: {e.raw_value}"
+            assert e.entity_type != "PHONE", f"False positive Phone detected: {e.raw_value}"
+
 
 

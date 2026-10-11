@@ -60,12 +60,14 @@ RULES = [
         "sensitivity": "Medium",
     },
 
-    # --- US Phone: (NXX) NXX-XXXX or NXX-NXX-XXXX or 10 contiguous digits ---
+    # --- US Phone: (NXX) NXX-XXXX, NXX-NXX-XXXX, NXX.NXX.XXXX,
+    #               and optional extension (x45 / ext 45 / ext. 45) ---
     {
         "pattern": _compile(
             r"(?<!\d)"
-            r"(\+?1[\s.\-]?)?"                     # optional country code
-            r"\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]\d{4}"
+            r"(\+?1[\s.\-]?)?"                       # optional country code
+            r"\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}"  # NXX sep NXX sep XXXX
+            r"(?:\s*(?:x|ext\.?|extension)\s*\d{1,6})?"  # optional extension
             r"(?!\d)"
         ),
         "entity_type": "PHONE",
@@ -75,15 +77,27 @@ RULES = [
         "sensitivity": "Medium",
     },
 
-    # --- India Phone: +91 followed by 10 digits ---
+    # --- India Phone: +91 followed by 10 digits (e.g. +91 98765 43210) ---
     {
         "pattern": _compile(
-            r"(?:^|(?<=[^\d+]))(\+91[\s\-]?|0)?[6-9]\d{9}(?!\d)"
+            r"(?:^|(?<=[^\d+]))(?:\+91[\s.\-]?)?[6-9]\d{4}[\s.\-]?\d{5}(?!\d)"
         ),
         "entity_type": "PHONE",
         "validator": None,
         "confidence": 0.82,
         "soft_penalty": 0.0,
+        "sensitivity": "Medium",
+    },
+
+    # --- US Phone: 10 contiguous digits (e.g. 4522327928) ---
+    {
+        "pattern": _compile(
+            r"(?<![\d\w\-])([2-9]\d{2}[2-9]\d{6})(?![\d\w\-])"
+        ),
+        "entity_type": "PHONE",
+        "validator": lambda t: not (t.startswith("20") and int(t[:4]) in range(1950, 2050)),
+        "confidence": 0.78,
+        "soft_penalty": 1.0,
         "sensitivity": "Medium",
     },
 
@@ -250,11 +264,13 @@ RULES = [
     # --- IPv4 labelled: "IP:" or "IP address:" context boost ---
     {
         "pattern": _compile(
-            r"(?i:ip(?:\s+address)?(?:\s*\([^)]*\))?|host)\s*[:\.\-]\s*([0-9\.\s]{7,18})\b"
+            r"(?i:ip(?:\s+address)?(?:\s*\([^)]*\))?|host|workstation\s+ip)\s*[:\.\-]\s*"
+            r"([0-9]{1,3}(?:[.\s][0-9]{1,3}){3})\b"
         ),
         "entity_type": "IP_ADDRESS",
-        "validator": lambda t: ipv4_check(re.search(r"([0-9\.\s]{7,18})", t).group(1) if re.search(r"([0-9\.\s]{7,18})", t) else t),
-        "confidence": 0.88,
+        "value_group": 1,
+        "validator": ipv4_check,
+        "confidence": 0.92,
         "soft_penalty": 1.0,  # hard-reject labelled IP if octets are invalid
         "sensitivity": "Low",
     },
@@ -271,7 +287,7 @@ RULES = [
         "sensitivity": "High",
     },
 
-    # --- IPv6 address (simplified) ---
+    # --- IPv6 address: full 8-group form ---
     {
         "pattern": _compile(
             r"\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b"
@@ -282,6 +298,36 @@ RULES = [
         "soft_penalty": 0.0,
         "sensitivity": "Low",
     },
+
+    # --- IPv6 address: compressed form with :: (e.g. ::1, fe80::1, 2001:db8::1) ---
+    {
+        "pattern": _compile(
+            r"\b(?:[0-9a-fA-F]{0,4}:){2,7}(?::[0-9a-fA-F]{0,4}|[0-9a-fA-F]{1,4})\b"
+        ),
+        "entity_type": "IP_ADDRESS",
+        "validator": None,
+        "confidence": 0.82,
+        "soft_penalty": 0.0,
+        "sensitivity": "Low",
+    },
+
+    # --- OCR-tolerant email: (at)/[at]/(AT)/[dot] forms and spaced @ ---
+    # Only evaluated on OCR chunks (is_ocr=True) so native precision does not drop.
+    {
+        "pattern": _compile(
+            r"[a-zA-Z0-9._%+\-]+"
+            r"(?:\s*@\s*|\s*\(at\)\s*|\s*\[at\]\s*|\s*AT\s+)"
+            r"[a-zA-Z0-9.\-]+"
+            r"(?:\s*\.\s*|\s*\[dot\]\s*|\s*\(dot\)\s*|\s+)"
+            r"[a-zA-Z]{2,10}"
+        ),
+        "entity_type": "EMAIL",
+        "ocr_only": True,
+        "validator": None,
+        "confidence": 0.82,
+        "soft_penalty": 0.0,
+        "sensitivity": "Medium",
+    },
 ]
 
 
@@ -289,7 +335,7 @@ RULES = [
 # Runner
 # ---------------------------------------------------------------------------
 
-def run_rules(text: str, config: dict) -> List[RawHit]:
+def run_rules(text: str, config: dict, is_ocr: bool = False) -> List[RawHit]:
     """
     Apply all enabled rules to `text` and return a list of RawHit objects.
 
@@ -297,6 +343,7 @@ def run_rules(text: str, config: dict) -> List[RawHit]:
     ----------
     text   : The chunk text to scan.
     config : Loaded config dict (used for enabled_entities and thresholds).
+    is_ocr : Whether this text was extracted via OCR (enables OCR-tolerant rules).
     """
     enabled: set = set(config.get("enabled_entities", [e["entity_type"] for e in RULES]))
     profile_name = config.get("active_profile", "balanced")
@@ -305,12 +352,23 @@ def run_rules(text: str, config: dict) -> List[RawHit]:
     hits: List[RawHit] = []
 
     for rule in RULES:
+        if rule.get("ocr_only") and not is_ocr:
+            continue
+
         etype = rule["entity_type"]
         if etype not in enabled:
             continue
 
         for m in rule["pattern"].finditer(text):
-            raw = m.group(0)
+            if "value_group" in rule and rule["value_group"] <= len(m.groups()):
+                raw = m.group(rule["value_group"])
+                start = m.start(rule["value_group"])
+                end = m.end(rule["value_group"])
+            else:
+                raw = m.group(0)
+                start = m.start()
+                end = m.end()
+
             conf = rule["confidence"]
             penalty = rule.get("soft_penalty", 0.0)
 
@@ -336,8 +394,8 @@ def run_rules(text: str, config: dict) -> List[RawHit]:
 
             hits.append(RawHit(
                 entity_type=etype,
-                start=m.start(),
-                end=m.end(),
+                start=start,
+                end=end,
                 text=raw,
                 confidence=min(conf, 1.0),
                 sensitivity=rule["sensitivity"],

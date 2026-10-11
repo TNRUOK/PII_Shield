@@ -1,0 +1,142 @@
+[
+  {
+    "dataset": "synthetic",
+    "document": "scanned_policy.pdf",
+    "location": "page:1",
+    "entity_type": "EMAIL",
+    "masked_text": "c*****************************m",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant not covered by rule"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "scanned_policy.pdf",
+    "location": "page:2",
+    "entity_type": "SSN",
+    "masked_text": "6*********0",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant / delimiter"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "scanned_policy.pdf",
+    "location": "page:2",
+    "entity_type": "IP_ADDRESS",
+    "masked_text": "1*********6",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "validator too strict or pattern missing (IP labelled prefix or format)"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "scanned_policy.pdf",
+    "location": "page:3",
+    "entity_type": "EMAIL",
+    "masked_text": "b*******************m",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant not covered by rule"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "scanned_policy.pdf",
+    "location": "page:3",
+    "entity_type": "PHONE",
+    "masked_text": "5**********0",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant (extension, dot separator, or international)"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "scanned_policy.pdf",
+    "location": "page:4",
+    "entity_type": "EMPLOYEE_ID",
+    "masked_text": "E************1",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant / prefix"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "training_guide.docx",
+    "location": "footnote:1",
+    "entity_type": "PERSON",
+    "masked_text": "D**********n",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "other"
+  },
+  {
+    "dataset": "synthetic",
+    "document": "training_guide.docx",
+    "location": "footnote:1",
+    "entity_type": "EMAIL",
+    "masked_text": "b**********************t",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant not covered by rule"
+  },
+  {
+    "dataset": "synthetic_holdout",
+    "document": "scanned_policy.pdf",
+    "location": "page:1",
+    "entity_type": "EMAIL",
+    "masked_text": "s*****************************m",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant not covered by rule"
+  },
+  {
+    "dataset": "synthetic_holdout",
+    "document": "scanned_policy.pdf",
+    "location": "page:2",
+    "entity_type": "SSN",
+    "masked_text": "4*********9",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant / delimiter"
+  },
+  {
+    "dataset": "synthetic_holdout",
+    "document": "scanned_policy.pdf",
+    "location": "page:2",
+    "entity_type": "IP_ADDRESS",
+    "masked_text": "1*********4",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "validator too strict or pattern missing (IP labelled prefix or format)"
+  },
+  {
+    "dataset": "synthetic_holdout",
+    "document": "scanned_policy.pdf",
+    "location": "page:3",
+    "entity_type": "PHONE",
+    "masked_text": "4********8",
+    "extraction_source": "ocr",
+    "context_snippet": "r. Michael Ryan Direct Phang: 4********8 Email: melissamorgan@example ",
+    "classification": "formatting variant (extension, dot separator, or international)"
+  },
+  {
+    "dataset": "synthetic_holdout",
+    "document": "scanned_policy.pdf",
+    "location": "page:3",
+    "entity_type": "EMAIL",
+    "masked_text": "m***********************t",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant not covered by rule"
+  },
+  {
+    "dataset": "synthetic_holdout",
+    "document": "scanned_policy.pdf",
+    "location": "page:4",
+    "entity_type": "EMAIL",
+    "masked_text": "h*************************m",
+    "extraction_source": "native",
+    "context_snippet": "",
+    "classification": "formatting variant not covered by rule"
+  }
+]

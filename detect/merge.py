@@ -181,7 +181,8 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
     if chunk.is_blocked() or not chunk.text.strip():
         return []
 
-    rule_hits = run_rules(chunk.text, config)
+    is_ocr = (chunk.method == "ocr") or (getattr(chunk, "ocr_confidence", None) is not None)
+    rule_hits = run_rules(chunk.text, config, is_ocr=is_ocr)
 
     # Run NER per table cell (not on the pipe-joined row) to prevent pipe delimiter confusion
     if "table:" in chunk.location and "|" in chunk.text:

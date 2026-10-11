@@ -188,7 +188,8 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                 (file_path, p, ocr_min_conf, config, OCR_RENDER_DPI)
                 for p in pages_to_ocr
             ]
-            with ProcessPoolExecutor(max_workers=workers) as executor:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=workers) as executor:
                 results = list(executor.map(_ocr_page_worker, worker_args))
             for p_num, ocr_text, mean_conf, sha1, err in results:
                 if sha1:

@@ -12,6 +12,7 @@ import io
 import math
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Tuple, Optional
@@ -138,6 +139,19 @@ def preprocess_adaptive(img: Image.Image) -> np.ndarray:
     return binary
 
 
+def _clean_ocr_line(line: str) -> str:
+    """Fix common Tesseract word-boundary segmentation errors."""
+    # 1. Join spaced email addresses (e.g. "compliance @cadencefinancial.com" or "user @ domain.com")
+    line = re.sub(r'(\b[a-zA-Z0-9._%+\-]+)\s*@\s*([a-zA-Z0-9.\-]+)\b', r'\1@\2', line)
+    # 2. Fix missing dot before common domain TLDs (e.g. "example net" -> "example.net")
+    line = re.sub(r'(@[a-zA-Z0-9\-]+)\s+(com|org|net|edu|gov|io|ai|co)\b', r'\1.\2', line)
+    # 3. Join broken IP address octets where a dot was read as space (e.g. "10.63 58.36" -> "10.63.58.36")
+    line = re.sub(r'(\b\d{1,3}\.\d{1,3})\s+(\d{1,3}\.\d{1,3}\b)', r'\1.\2', line)
+    line = re.sub(r'(\b\d{1,3}\.\d{1,3}\.\d{1,3})\s+(\d{1,3}\b)', r'\1.\2', line)
+    line = re.sub(r'(\b\d{1,3})\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\b)', r'\1.\2', line)
+    return line
+
+
 def _reconstruct_text(valid: "pd.DataFrame") -> str:
     """Preserve line structure by grouping words by (block_num, par_num, line_num)."""
     if valid.empty:
@@ -147,7 +161,7 @@ def _reconstruct_text(valid: "pd.DataFrame") -> str:
     for _, line_group in sorted_df.groupby(["block_num", "par_num", "line_num"], sort=False):
         words = [w for w in line_group["text"].dropna().astype(str) if w.strip()]
         if words:
-            lines.append(" ".join(words))
+            lines.append(_clean_ocr_line(" ".join(words)))
     return "\n".join(lines)
 
 
