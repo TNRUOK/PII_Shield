@@ -1,5 +1,107 @@
 # CHANGELOG
 
+## [1.3.0] — 2026-10-11 (Phase 3 Independent Review & Benchmark)
+
+### Summary
+Targeted fixes addressing three issues identified during independent review:
+1. Group-column over-redaction veto in `detect/context.py`.
+2. Cross-platform TrueType font helper and bundled DejaVuSans font in `tests/test_extractors.py`.
+3. Rule and OCR post-processing fixes in `detect/rules.py`, `detect/merge.py`, `extract/ocr.py`, and `extract/pdf.py` for labelled IPv4 extraction, 10-digit/extension/international phone formats, OCR email noise handling, and parallel OCR reliability.
+Zero remote pushes; all changes verified locally. Test suite passes 160/160 tests.
+
+---
+
+### Issue 1: Group-Column Header Exclusion (`detect/context.py`)
+- Added `_HEADER_EXCLUSION_RE` with word-boundary exclusion keywords: `group, groups, team, teams, department, departments, dept, role, roles, title, permission, permissions, description, type, status, workflow, stage`.
+- Implemented `_header_is_name_column()` and `_header_is_pii_column()` ensuring an explicit organizational-structure exclusion always vetos a keyword match (e.g. `USER GROUPS` is never treated as a names column).
+- Preserved name columns without exclusion keywords: `USERS`, `Name`, `Member`, `Reviewer`, `Author(s)`, `Client Contact`, `Peer Reviewer`, `Approver`, `Owner`.
+- Added test class `TestGroupColumnExclusion` verifying:
+  - `USER GROUPS | DESCRIPTION | PERMISSIONS | USERS` does not flag group cells, but flags initials/title-case names in USERS (`TJ Harlan`, `PQ Lindqvist`).
+  - `TEAM | REVIEWER` does not flag team cells, but flags reviewer names (`RK Patel`).
+  - Key-value tables with `Author(s)`, `Client Contact`, `Peer Reviewer` flag names.
+  - Body text phrases `BYOD Allowed`, `MFA`, and `Launching ServPro` are not flagged as PERSON.
+
+### Issue 2: Cross-Platform Font Helper for Deskew Test (`tests/test_extractors.py`, `tests/assets/`)
+- Added bundled open TrueType font `tests/assets/DejaVuSans.ttf` (Bitstream Vera / DejaVu Fonts permissive open license; documented in `tests/assets/FONT_LICENSE.txt`).
+- Implemented portable `_find_font(size)` helper checking bundled font, followed by standard Windows, Linux (`/usr/share/fonts/truetype/...`), and macOS system paths.
+- Replaced hardcoded `"arial.ttf"` and `ImageFont.load_default()` fallback in `TestDeskew` and `TestOCRPipeline`. If no TrueType font is present, tests skip explicitly with an informative message rather than failing due to bitmap font OCR illegibility.
+
+### Issue 3: Detection Recall & OCR Post-Processing (`detect/rules.py`, `detect/merge.py`, `extract/ocr.py`, `extract/pdf.py`)
+- **Labelled IPv4 Address Extraction**:
+  - Added `"value_group": 1` to labelled IP rule so detection extracts only the IP digits without the `"IP Address (workstation): "` label prefix.
+  - Supported labelled prefix variations (`host`, `workstation ip`).
+  - Synthetic IP recall improved from **0.0000 (0/1)** to **1.0000 (1/1, 100% precision/recall)**.
+- **Phone Number Coverage**:
+  - Added 10 contiguous digits NANP format `(?<![\d\w\-])([2-9]\d{2}[2-9]\d{6})(?![\d\w\-])` with date-guard validator.
+  - Expanded Indian phone rule to support space-separated 5-5 digit groupings (`+91 98765 43210`).
+  - Holdout phone recall improved from **0.8571 (6/7)** to **1.0000 (7/7, 100% recall)**.
+- **OCR Email & Text Cleanup**:
+  - Added `_clean_ocr_line()` in `extract/ocr.py` repairing Tesseract segmentation artifacts: space before `@` (`compliance @domain.com` -> `compliance@domain.com`), missing dots before common TLDs (`example net` -> `example.net`), and spaced IPv4 octets (`10.63 58.36` -> `10.63.58.36`).
+  - Added OCR-tolerant email rule in `detect/rules.py` restricted to OCR chunks (`is_ocr=True`) so native text precision does not drop.
+  - Synthetic email recall improved from **0.8500** to **0.9000** (precision improved from **0.8947** to **0.9474**). Holdout email recall improved from **0.6250** to **0.7500**.
+- **Parallel OCR Stability**:
+  - Switched `ProcessPoolExecutor` to `ThreadPoolExecutor` in `extract/pdf.py` to prevent Windows child process bootstrap crashes while preserving multi-threaded OCR throughput.
+- **Precision Guards**:
+  - Verified non-PII look-alikes (`12/05/2026`, `4.31.2`, `PRD-20240115`, `QRC_Sec_4.31`, `REF-9876543210123`) produce 0 false positives.
+
+---
+
+### Measured Benchmark Comparison
+
+#### Synthetic Dataset (`/synthetic` — Seed 42)
+| Entity Type | Baseline TP/FP/FN | Baseline P / R / F1 | After TP/FP/FN | After P / R / F1 |
+|---|---|---|---|---|
+| **OVERALL** | 87 / 9 / 8 | 0.9062 / 0.9158 / 0.9110 | **89 / 7 / 6** | **0.9271 / 0.9368 / 0.9319** |
+| IP_ADDRESS | 0 / 1 / 1 | 0.0000 / 0.0000 / 0.0000 | **1 / 0 / 0** | **1.0000 / 1.0000 / 1.0000** |
+| EMAIL | 17 / 2 / 3 | 0.8947 / 0.8500 / 0.8718 | **18 / 1 / 2** | **0.9474 / 0.9000 / 0.9231** |
+| PHONE | 13 / 0 / 1 | 1.0000 / 0.9286 / 0.9630 | 13 / 0 / 1 | 1.0000 / 0.9286 / 0.9630 |
+| PERSON | 48 / 4 / 1 | 0.9231 / 0.9796 / 0.9505 | 48 / 4 / 1 | 0.9231 / 0.9796 / 0.9505 |
+| EMPLOYEE_ID | 6 / 1 / 1 | 0.8571 / 0.8571 / 0.8571 | 6 / 1 / 1 | 0.8571 / 0.8571 / 0.8571 |
+| AADHAAR | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| PAN | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| SSN | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 |
+| GOVERNMENT_ID | 0 / 1 / 0 | 0.0000 / 0.0000 / 0.0000 | 0 / 1 / 0 | 0.0000 / 0.0000 / 0.0000 |
+
+Structure Retention:
+- `org_pack.pptx`: 0.8978 (target ≥ 0.80 ✅)
+- `scanned_policy.pdf`: 0.9608 (target ≥ 0.80 ✅)
+- `training_guide.docx`: 0.9887 (target ≥ 0.80 ✅)
+Confirmed Leaks: **0 (Safe ✅)**
+
+#### Hold-Out Dataset (`/synthetic_holdout` — Seed 99, unseen)
+| Entity Type | Baseline TP/FP/FN | Baseline P / R / F1 | After TP/FP/FN | After P / R / F1 |
+|---|---|---|---|---|
+| **OVERALL** | 34 / 4 / 6 | 0.8947 / 0.8500 / 0.8718 | **36 / 4 / 4** | **0.9000 / 0.9000 / 0.9000** |
+| PHONE | 6 / 0 / 1 | 1.0000 / 0.8571 / 0.9231 | **7 / 0 / 0** | **1.0000 / 1.0000 / 1.0000** |
+| EMAIL | 5 / 2 / 3 | 0.7143 / 0.6250 / 0.6667 | **6 / 2 / 2** | **0.7500 / 0.7500 / 0.7500** |
+| PERSON | 21 / 1 / 0 | 0.9545 / 1.0000 / 0.9767 | 21 / 1 / 0 | 0.9545 / 1.0000 / 0.9767 |
+| EMPLOYEE_ID | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| IP_ADDRESS | 0 / 1 / 1 | 0.0000 / 0.0000 / 0.0000 | 0 / 1 / 1 | 0.0000 / 0.0000 / 0.0000 |
+| SSN | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 |
+
+Structure Retention:
+- `org_pack.pptx`: 0.9830 (target ≥ 0.80 ✅)
+- `scanned_policy.pdf`: 0.9201 (target ≥ 0.80 ✅)
+- `training_guide.docx`: 0.8929 (target ≥ 0.80 ✅)
+Confirmed Leaks: **0 (Safe ✅)**
+
+---
+
+### Remaining Misses & Analysis
+Saved to `miss_analysis.json` (masked values, no raw PII):
+1. **Physical Extraction Gaps**:
+   - `training_guide.docx` footnote:1 `PERSON: D**********n` and `EMAIL: b**********************t`: Physically absent from DOCX file XML due to generator omission.
+   - `scanned_policy.pdf` page:2 `SSN: 6*********0` (synthetic) and `4*********9` (holdout): Tesseract completely dropped the digits line under low-contrast scan simulation.
+2. **Heavy OCR Noise & Typo Substitutions**:
+   - `scanned_policy.pdf` page:3 `EMAIL: b*******************m` (synthetic): OCR read 'ri' as 'rn' (`blakeernik@example.com` vs `blakeerik@example.com`).
+   - `scanned_policy.pdf` page:3 `PHONE: 5**********0` (synthetic): OCR read initial digit 5 as `$` (`$84-695-9310`).
+   - `scanned_policy.pdf` page:4 `EMPLOYEE_ID: E************1` (synthetic): OCR injected punctuation `EMP-098/76543?1`.
+   - `scanned_policy.pdf` page:1 `EMAIL: s*****************************m` (holdout): OCR missed 'i' and misread 'g' as 'q' (`securty@vanquard-logistics.com`).
+   - `scanned_policy.pdf` page:2 `IP_ADDRESS: 1*********4` (holdout): OCR misread first octet '10' as '19' (`19.46.59.64`).
+   - `scanned_policy.pdf` page:4 `EMAIL: h*************************m` (holdout): OCR heavy character confusion (`hamisanichard@example.cam`).
+
+---
+
 ## [1.2.0] — 2026-10-10 (Phase 2 Hardening)
 
 ### Summary
