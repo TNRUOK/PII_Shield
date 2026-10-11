@@ -24,8 +24,8 @@ from typing import List, Dict, Set, Tuple, Optional
 
 log = logging.getLogger(__name__)
 
-# Minimum alias length to avoid propagating initials like "J" alone
-_MIN_ALIAS_LEN = 3
+# Minimum alias length to avoid propagating initials like "J" or short tokens
+_MIN_ALIAS_LEN = 4  # raised from 3 — reduces single-word FP noise
 
 # Look-alike guard — do not propagate numeric/version/date tokens
 _NUMERIC_OR_DATE_RE = re.compile(r"^[\d./\-]+$")
@@ -106,16 +106,39 @@ def propagate_name_aliases(
     """
     from detect.merge import Entity, _mask
 
+    if not config.get("alias_propagation", True):
+        return []
+
     exclusions: Set[str] = set(config.get("alias_exclusions", []))
+    source_stoplist: Set[str] = {
+        w.lower() for w in config.get(
+            "alias_source_stoplist",
+            [
+                "Road", "Street", "Avenue", "Lane", "Drive", "Park",
+                "Square", "Bank", "Group", "Team", "Board", "Office",
+                "Center", "Centre", "Tower", "House", "Bridge", "City",
+                "Valley", "Hill", "Hall", "Court", "Plaza", "Market",
+                "Systems", "Services", "Solutions", "Partners", "Holdings",
+                "Logistics", "Review", "Release", "Quality",
+            ]
+        )
+    }
+    max_per_doc: int = int(config.get("alias_max_per_document", 50))
     sensitivity_map = config.get("sensitivity_map", {})
 
     # Map canonical person raw_value → placeholder
+    # Skip sources containing a stoplisted word (e.g. "Menon Road" → skip)
     person_map: Dict[str, str] = {}
     for ent in person_entities:
         raw = (ent.raw_value or "").strip()
         tokens = raw.split()
-        if len(tokens) >= 2:
-            person_map[raw] = ent.placeholder or ""
+        if len(tokens) < 2:
+            continue
+        # Stoplist gating: reject if any token (lower) is in the source stoplist
+        if any(tok.lower().rstrip(".,;'") in source_stoplist for tok in tokens):
+            log.debug("Alias propagation: skipping stoplisted source %r", raw)
+            continue
+        person_map[raw] = ent.placeholder or ""
 
     if not person_map:
         return []
@@ -195,6 +218,9 @@ def propagate_name_aliases(
                     chunk_index=chunk_idx,
                 ))
                 already_covered.append((s, e))
+                if len(new_entities) >= max_per_doc:
+                    log.debug("Alias propagation cap reached (%d) for %s", max_per_doc, file)
+                    return new_entities
 
     log.debug(
         "Alias propagation: %d canonical persons → %d alias aliases → %d new hits in %s",
