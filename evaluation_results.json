@@ -9,12 +9,12 @@
       "f1": 1.0
     },
     "EMAIL": {
-      "tp": 17,
+      "tp": 18,
       "fp": 1,
-      "fn": 3,
-      "precision": 0.9444,
-      "recall": 0.85,
-      "f1": 0.8947
+      "fn": 2,
+      "precision": 0.9474,
+      "recall": 0.9,
+      "f1": 0.9231
     },
     "EMPLOYEE_ID": {
       "tp": 6,
@@ -33,12 +33,12 @@
       "f1": 0.0
     },
     "IP_ADDRESS": {
-      "tp": 0,
-      "fp": 1,
-      "fn": 1,
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1": 0.0
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
     },
     "PAN": {
       "tp": 1,
@@ -72,18 +72,46 @@
       "recall": 0.5,
       "f1": 0.6667
     },
+    "SUSPECT_OCR": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
     "OVERALL": {
-      "tp": 87,
+      "tp": 89,
       "fp": 8,
-      "fn": 8,
-      "precision": 0.9158,
-      "recall": 0.9158,
-      "f1": 0.9158
+      "fn": 6,
+      "precision": 0.9175,
+      "recall": 0.9368,
+      "f1": 0.9271
     }
   },
   "structure_retention": {
     "org_pack.pptx": 0.8978,
-    "scanned_policy.pdf": 0.9598,
+    "scanned_policy.pdf": 0.9608,
     "training_guide.docx": 0.9887
-  }
+  },
+  "throughput": [
+    {
+      "file": "org_pack.pptx",
+      "seconds": 3.6893110000528395,
+      "pages": 8,
+      "ppm": 130.10559424053034
+    },
+    {
+      "file": "scanned_policy.pdf",
+      "seconds": 2.5485450997948647,
+      "pages": 6,
+      "ppm": 141.25706467936425
+    },
+    {
+      "file": "training_guide.docx",
+      "seconds": 3.738395099993795,
+      "pages": 4,
+      "ppm": 64.19867177773648
+    }
+  ]
 }

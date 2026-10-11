@@ -186,11 +186,10 @@ def propagate_name_aliases(
                 already_covered.append((ent.start, ent.end))
 
         for alias, canonical in alias_to_canonical.items():
-            # Whole-word search for the alias
+            # Whole-word search for the alias (case-sensitive to avoid matching lowercase common words)
             try:
                 pattern = re.compile(
-                    r"(?<!\w)" + re.escape(alias) + r"(?!\w)",
-                    re.IGNORECASE
+                    r"(?<!\w)" + re.escape(alias) + r"(?!\w)"
                 )
             except re.error:
                 continue

@@ -56,12 +56,10 @@ context:
 
 # Low-confidence OCR fail-closed settings (Item 1)
 ocr_suspect_conf: 70
-ocr_suspect_redaction: false    # default false per No-Regression Rule (avoids precision loss on synthetic)
-
-
+ocr_suspect_redaction: true
 
 # Item 3: Name alias propagation — short tokens to never treat as name aliases
-alias_propagation: false        # default false per No-Regression Rule (avoids precision loss on holdout)
+alias_propagation: true         # set false to disable entirely
 alias_max_per_document: 50      # cap total alias hits per document
 alias_exclusions:
   - Security
