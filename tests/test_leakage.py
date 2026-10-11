@@ -256,3 +256,95 @@ def test_residue_reporting_masks_all_values(config):
         assert "*" in res_str
 
 
+def test_zero_raw_pii_in_pipeline_logs_and_reports(config, tmp_path, caplog):
+    """
+    Item 4 security guarantee:
+    Scans every log line, report, and exported mapping file produced by a full run
+    for raw values listed in ground truth. Raw values must never appear in logs or reports.
+    """
+    import json
+    import logging
+    from extract.router import route
+    from detect.merge import detect_chunk
+    from detect.propagate import propagate_name_aliases
+    from redact.redactor import redact_chunks
+    from redact.mapping import PlaceholderMapping
+    from verify.leakage import check_leakage
+    from report.report import build_file_summary, generate_report
+
+    # Load ground truth raw values
+    gt_file = ROOT / "synthetic" / "ground_truth" / "training_guide.json"
+    assert gt_file.exists(), "Ground truth file missing"
+    with open(gt_file, "r", encoding="utf-8") as f:
+        gt_data = json.load(f)
+
+    # Collect raw values to check (skip very short or trivial words)
+    raw_secrets = set()
+    for ent in gt_data.get("entities", []):
+        raw = ent.get("text", "").strip()
+        if len(raw) >= 4:
+            raw_secrets.add(raw)
+
+    assert len(raw_secrets) > 0, "No raw ground truth secrets found"
+
+    # Capture logs during the run
+    with caplog.at_level(logging.DEBUG):
+        doc_path = ROOT / "synthetic" / "training_guide.docx"
+        chunks = route(str(doc_path), config)
+
+        file_entities = []
+        for chunk in chunks:
+            if not chunk.is_blocked():
+                file_entities.extend(detect_chunk(chunk, config))
+
+        # Propagate aliases
+        person_ents = [e for e in file_entities if e.entity_type == "PERSON"]
+        chunk_texts = [c.text for c in chunks if not c.is_blocked()]
+        chunk_locs = [c.location for c in chunks if not c.is_blocked()]
+        alias_ents = propagate_name_aliases(
+            chunk_texts, person_ents, file_entities, config,
+            file=str(doc_path), locations=chunk_locs,
+        )
+        file_entities.extend(alias_ents)
+
+        # Redact with encrypted mapping
+        out_dir = tmp_path / "out_audit"
+        mapping = PlaceholderMapping(source_file=str(doc_path), output_dir=str(out_dir))
+        redacted = redact_chunks(chunks, file_entities, mapping, config)
+        mapping.save()
+
+        # Leak check
+        leak_res = check_leakage(redacted, config, known_values=mapping)
+
+        # Build summary and generate report
+        summary = build_file_summary(str(doc_path), chunks, file_entities, leak_res, structure_score=0.95)
+        rep_paths = generate_report([summary], file_entities, str(out_dir))
+
+    # 1. Check all log records: ZERO unmasked raw PII allowed in logs
+    all_log_text = " ".join([rec.getMessage() for rec in caplog.records])
+    for secret in raw_secrets:
+        assert secret not in all_log_text, f"LEAK IN LOGS: Raw ground truth value '{secret}' found in pipeline logs!"
+
+    # 2. Check generated report files (CSV and JSON): ZERO raw PII allowed in reports
+    with open(rep_paths["csv"], "r", encoding="utf-8") as f:
+        csv_text = f.read()
+    with open(rep_paths["json"], "r", encoding="utf-8") as f:
+        json_text = f.read()
+
+    for secret in raw_secrets:
+        assert secret not in csv_text, f"LEAK IN CSV REPORT: Raw value '{secret}' found in CSV report!"
+        assert secret not in json_text, f"LEAK IN JSON REPORT: Raw value '{secret}' found in JSON report!"
+
+    # 3. Check mapping file at rest on disk: must be encrypted (ciphertext)
+    assert mapping.mapping_path.exists()
+    raw_mapping_bytes = mapping.mapping_path.read_bytes()
+    for secret in raw_secrets:
+        assert secret.encode("utf-8") not in raw_mapping_bytes, \
+            f"LEAK IN MAPPING AT REST: Raw value '{secret}' found unencrypted in mapping file!"
+
+    # 4. Clean up / purge
+    mapping.purge()
+    assert not mapping.mapping_path.exists()
+
+
+

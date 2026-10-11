@@ -377,17 +377,18 @@ def run_rules(text: str, config: dict, is_ocr: bool = False) -> List[RawHit]:
                 try:
                     valid = rule["validator"](raw)
                 except Exception as exc:
-                    log.debug("Validator error for %s on %r: %s", etype, raw, exc)
+                    log.debug("Validator error for %s (span [%d:%d]): %s", etype, start, end, exc)
                     valid = False
 
                 if not valid:
                     if penalty >= 1.0:
                         # Hard reject
-                        log.debug("Hard-rejected %s match: %r", etype, raw[:30])
+                        log.debug("Hard-rejected %s match (span [%d:%d])", etype, start, end)
                         continue
                     else:
                         conf -= penalty
-                        log.debug("Soft-penalised %s match: %r → conf %.2f", etype, raw[:30], conf)
+                        log.debug("Soft-penalised %s match (span [%d:%d]) → conf %.2f", etype, start, end, conf)
+
 
             if conf < min_conf:
                 continue

@@ -132,7 +132,7 @@ def run_ner(text: str, config: dict) -> List[RawHit]:
 
         if our_type == "PERSON":
             if not plausible_person(raw_text, denylist):
-                log.debug("Rejected non-plausible PERSON candidate: %s", raw_text)
+                log.debug("Rejected non-plausible PERSON candidate (span [%d:%d])", start, end)
                 continue
 
             from detect.context import _NAME_STOP_WORDS

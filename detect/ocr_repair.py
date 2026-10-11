@@ -180,8 +180,8 @@ def find_ocr_repair_hits(chunk, config: dict) -> List[RawHit]:
 
         if entity_type:
             log.debug(
-                "OCR repair: '%s' → '%s' detected as %s (span %d-%d)",
-                raw_token, repaired, entity_type, m.start(), m.end()
+                "OCR repair: detected as %s (span [%d:%d])",
+                entity_type, m.start(), m.end()
             )
             hits.append(RawHit(
                 entity_type=entity_type,
@@ -204,9 +204,10 @@ def find_ocr_repair_hits(chunk, config: dict) -> List[RawHit]:
         if "@" not in repaired_email or "." not in repaired_email.split("@")[-1]:
             continue
         log.debug(
-            "OCR email TLD repair: '%s' → '%s' (span %d-%d)",
-            raw_email, repaired_email, m.start(), m.end()
+            "OCR email TLD repair (span [%d:%d])",
+            m.start(), m.end()
         )
+
         hits.append(RawHit(
             entity_type="EMAIL",
             start=m.start(),

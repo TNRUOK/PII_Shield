@@ -26,3 +26,7 @@ pyyaml>=6.0.0
 
 # Testing & Verification
 pytest>=7.4.0
+
+# Security & Encryption (Item 4)
+cryptography>=42.0.0
+

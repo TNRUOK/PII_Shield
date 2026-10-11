@@ -236,3 +236,21 @@ or double-click `run_extension_bridge.bat`. The bridge listens securely on `http
    - In image-only PDFs with dense multi-column layouts, standard horizontal block reading order can occasionally interleave across column gutters. Using PyMuPDF block layout sorting mitigates this for native PDFs.
 4. **LOCATION Entity Sensitivity**:
    - Detecting geographic locations has a high false-positive rate on corporate entity names (e.g., "Cadence Financial" or "Dallas Asset Management"). `LOCATION` detection is disabled by default in `config.yaml` to optimize precision.
+
+---
+
+## Threat Model & Mapping File Security
+
+### Threat Model
+The core security guarantee of PII Shield is that **raw Personally Identifiable Information never leaves the local perimeter unencrypted or unmasked**:
+- **External AI Services & Downstream LLMs**: Receive ONLY uniform placeholder tokens (`[PERSON_1]`, `[EMAIL_1]`). The fail-closed leakage verification scanner ensures that zero residual PII is passed downstream.
+- **Audit Logs & Telemetry**: Every audit log, summary report (CSV/JSON), and Gradio UI view contains only masked values (`J*****h`). Raw values are guaranteed never to appear in logs or reports.
+- **At-Rest Encryption**: The mapping store (`*_mapping.json`), which associates placeholders with raw values, is **encrypted at rest** using Fernet authenticated symmetric encryption (`cryptography` package, AES-128-CBC with HMAC-SHA256).
+- **Key Isolation & Permissions**: Session encryption keys are held in memory by default. If saved to disk, keys are placed in an isolated directory (`~/.pii_shield_keys`), never adjacent to mapping files, and protected by owner-only permissions (`0600` on POSIX; on Windows NTFS, access is restricted to the current user).
+- **Secure Purge**: Mappings and keys are automatically wiped at process exit by default, or immediately via the Gradio UI "🗑️ Purge" button and CLI purge flags. File contents are overwritten with `os.urandom` bytes before unlinking to eliminate storage residue.
+
+### How Restore Works
+1. **Browser Extension / Local Bridge**: When an LLM responds with placeholder tokens (`[PERSON_1] should email [EMAIL_1]`), the extension sends the text to the local bridge server (`POST /restore_text`). The bridge matches tokens against the in-memory session mapping in descending token-length order and replaces them with original text directly in the browser DOM.
+2. **Programmatic Restoration**: An authorized local pipeline can decrypt mapping files using `PlaceholderMapping(..., key=...).load()`.
+3. **Purge on Exit**: When the pipeline or Gradio server terminates, `atexit` securely destroys active mapping files and resets session keys.
+

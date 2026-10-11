@@ -36,7 +36,7 @@ from extract.router import route
 from extract.models import Chunk
 from extract.ocr import is_tesseract_available
 from detect.merge import detect_chunk, Entity
-from redact.mapping import PlaceholderMapping
+from redact.mapping import PlaceholderMapping, purge_all_active_mappings
 from redact.redactor import redact_chunks
 from verify.leakage import check_leakage
 from report.report import build_file_summary, generate_report, print_summary_table
@@ -45,6 +45,18 @@ log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 CONFIG_PATH = _ROOT / "config.yaml"
+
+# Process-exit purge for sensitive placeholder mappings (default enabled)
+_KEEP_MAPPINGS: bool = False
+
+def _exit_purge_handler():
+    if not _KEEP_MAPPINGS:
+        purged = purge_all_active_mappings()
+        log.info("Process exit: purged %d sensitive mapping file(s)", purged)
+
+import atexit
+atexit.register(_exit_purge_handler)
+
 
 
 def _load_config() -> dict:
@@ -271,6 +283,31 @@ def build_ui() -> gr.Blocks:
                     dl_csv  = gr.File(label="⬇️ Download Report (CSV)")
                     dl_json = gr.File(label="⬇️ Download Report (JSON)")
 
+        with gr.Accordion("🔒 Security & Key Management", open=False):
+            gr.Markdown(
+                "Placeholder mappings are **encrypted at rest** using Fernet (AES-128-CBC + HMAC-SHA256). "
+                "By default, all mappings and encryption keys are securely wiped at process exit."
+            )
+            keep_mappings_cb = gr.Checkbox(
+                label="Keep mapping files after process exit (testing / debugging only)",
+                value=False,
+            )
+            def _toggle_keep(val):
+                global _KEEP_MAPPINGS
+                _KEEP_MAPPINGS = bool(val)
+                return f"Keep mappings: {val}"
+            keep_mappings_cb.change(fn=_toggle_keep, inputs=[keep_mappings_cb], outputs=[])
+
+            with gr.Row():
+                purge_btn = gr.Button("🗑️ Purge Sensitive Mappings & Keys Now", variant="stop")
+            purge_status = gr.Markdown()
+
+            def _do_purge():
+                count = purge_all_active_mappings()
+                return f"✅ **Purged {count} mapping file(s) and reset session encryption keys.**"
+
+            purge_btn.click(fn=_do_purge, inputs=[], outputs=[purge_status])
+
         run_btn.click(
             fn=process_files,
             inputs=[file_input, profile_radio],
@@ -283,8 +320,9 @@ def build_ui() -> gr.Blocks:
 if __name__ == "__main__":
     ui = build_ui()
     ui.launch(
-        server_name="0.0.0.0",
+        server_name="127.0.0.1",
         server_port=7860,
         share=False,
         show_error=True,
     )
+

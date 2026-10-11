@@ -120,8 +120,40 @@ class TestRedaction:
         redact_chunks([chunk], [ent], mapping, config)
         mapping.save()
         assert mapping.mapping_path.exists()
-        import json
-        with open(mapping.mapping_path) as fh:
-            data = json.load(fh)
-        assert "[SSN_1]" in data["mappings"]
-        assert data["mappings"]["[SSN_1]"] == "123-45-6789"
+        # Verify file at rest is encrypted — raw PII never appears in plaintext
+        raw_content = mapping.mapping_path.read_bytes()
+        assert b"123-45-6789" not in raw_content
+        # Decrypt via load() using session key
+        m2 = PlaceholderMapping("test.docx", str(tmp_path), key=mapping.key)
+        m2.load()
+        assert m2._placeholder_to_raw.get("[SSN_1]") == "123-45-6789"
+
+    def test_mapping_secure_purge(self, mapping, config, tmp_path):
+        """Purge must securely overwrite and delete the mapping file."""
+        text = "Account: 9876543210"
+        chunk = _chunk(text)
+        ent = _make_entity("ACCOUNT", 9, 19, "9876543210")
+        redact_chunks([chunk], [ent], mapping, config)
+        mapping.save()
+        assert mapping.mapping_path.exists()
+        res = mapping.purge()
+        assert res is True
+        assert not mapping.mapping_path.exists()
+        assert len(mapping._placeholder_to_raw) == 0
+
+    def test_mapping_separate_key_storage(self, config, tmp_path):
+        """Key file stored in separate directory when requested; never next to mapping."""
+        key_dir = tmp_path / "keys_vault"
+        out_dir = tmp_path / "output_vault"
+        m = PlaceholderMapping("doc.docx", str(out_dir), key_dir=str(key_dir), save_key_to_file=True)
+        m.get_or_create("EMAIL", "user@test.org")
+        m.save()
+        assert m.key_path is not None
+        assert m.key_path.exists()
+        assert m.key_path.parent != m.mapping_path.parent
+        # Purge deletes both
+        from redact.mapping import purge_mapping
+        purge_mapping(m)
+        assert not m.mapping_path.exists()
+        assert not m.key_path.exists()
+
