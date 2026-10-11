@@ -148,21 +148,46 @@ def _clean_ocr_line(line: str) -> str:
     # 3. Join broken IP address octets where a dot was read as space (e.g. "10.63 58.36" -> "10.63.58.36")
     line = re.sub(r'(\b\d{1,3}\.\d{1,3})\s+(\d{1,3}\.\d{1,3}\b)', r'\1.\2', line)
     line = re.sub(r'(\b\d{1,3}\.\d{1,3}\.\d{1,3})\s+(\d{1,3}\b)', r'\1.\2', line)
-    line = re.sub(r'(\b\d{1,3})\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\b)', r'\1.\2', line)
     return line
 
 
-def _reconstruct_text(valid: "pd.DataFrame") -> str:
-    """Preserve line structure by grouping words by (block_num, par_num, line_num)."""
+class OCRResult(tuple):
+    """
+    A 2-tuple (text, mean_confidence) backward-compatible with all callers,
+    with an additional line_confidences attribute storing [(line_text, mean_line_conf), ...].
+    """
+    text: str
+    confidence: float
+    line_confidences: List[Tuple[str, float]]
+
+    def __new__(cls, text: str, confidence: float, line_confidences: Optional[List[Tuple[str, float]]] = None):
+        obj = super().__new__(cls, (text, confidence))
+        obj.text = text
+        obj.confidence = confidence
+        obj.line_confidences = line_confidences or []
+        return obj
+
+
+def _reconstruct_text_with_confs(valid: "pd.DataFrame") -> Tuple[str, List[Tuple[str, float]]]:
+    """Preserve line structure and collect per-line mean word confidences."""
     if valid.empty:
-        return ""
+        return "", []
     lines = []
+    line_confs = []
     sorted_df = valid.sort_values(by=["block_num", "par_num", "line_num", "word_num"])
     for _, line_group in sorted_df.groupby(["block_num", "par_num", "line_num"], sort=False):
         words = [w for w in line_group["text"].dropna().astype(str) if w.strip()]
         if words:
-            lines.append(_clean_ocr_line(" ".join(words)))
-    return "\n".join(lines)
+            clean_l = _clean_ocr_line(" ".join(words))
+            lines.append(clean_l)
+            l_conf = float(line_group["conf"].mean())
+            line_confs.append((clean_l, l_conf))
+    return "\n".join(lines), line_confs
+
+
+def _reconstruct_text(valid: "pd.DataFrame") -> str:
+    text, _ = _reconstruct_text_with_confs(valid)
+    return text
 
 
 def is_tesseract_available() -> bool:
@@ -176,24 +201,20 @@ def ocr_image(
     lang: str = "eng",
     min_confidence: float = 40.0,
     config: Optional[dict] = None,
-) -> Tuple[str, float]:
+) -> OCRResult:
     """
     Run Tesseract on a (possibly preprocessed) PIL image.
 
     Returns
     -------
-    (text, mean_confidence)
-        text             : The recognised text preserving line structure (\n).
+    OCRResult(text, mean_confidence, line_confidences)
+        text             : The recognised text preserving line structure (\\n).
         mean_confidence  : Mean per-word confidence from image_to_data (0–100).
-                           Returns 0.0 if no words recognised.
-
-    If mean_confidence < min_confidence the text is still returned — the *caller*
-    decides whether to emit a BLOCKED chunk based on the configured threshold.
-    This lets unit tests inspect the confidence value independently.
+        line_confidences : List of (line_text, mean_line_confidence).
     """
     if not is_tesseract_available():
         log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
-        return "", 0.0
+        return OCRResult("", 0.0, [])
 
     psm_primary = config.get("ocr_psm", 6) if config else 6
     oem = config.get("ocr_oem", 3) if config else 3
@@ -201,7 +222,7 @@ def ocr_image(
     preprocessed_otsu = preprocess(img)
     pil_otsu = cv2_to_pil(preprocessed_otsu)
 
-    def _run_tesseract(pil_img: Image.Image, psm: int) -> Tuple[str, float]:
+    def _run_tesseract(pil_img: Image.Image, psm: int) -> OCRResult:
         tess_config = f"--oem {oem} --psm {psm}"
         try:
             data = pytesseract.image_to_data(
@@ -211,55 +232,55 @@ def ocr_image(
                 output_type=Output.DATAFRAME,
             )
             if data is None or data.empty:
-                return "", 0.0
+                return OCRResult("", 0.0, [])
             valid = data[data["conf"] > 0].copy()
             if valid.empty:
-                return "", 0.0
+                return OCRResult("", 0.0, [])
             conf = float(valid["conf"].mean())
-            text = _reconstruct_text(valid)
-            return text, conf
+            text, line_confs = _reconstruct_text_with_confs(valid)
+            return OCRResult(text, conf, line_confs)
         except pytesseract.TesseractNotFoundError:
             log.error("Tesseract not found. Please install Tesseract-OCR and add to PATH.")
-            return "", 0.0
+            return OCRResult("", 0.0, [])
         except Exception as exc:
             log.error("Tesseract execution failed (psm=%d): %s", psm, exc)
-            return "", 0.0
+            return OCRResult("", 0.0, [])
 
     # Primary attempt: psm_primary with Otsu
-    best_text, best_conf = _run_tesseract(pil_otsu, psm=psm_primary)
+    best = _run_tesseract(pil_otsu, psm=psm_primary)
 
     # Fallback 1: If below min_confidence or empty, try PSM 4 (single column variable sizes)
-    if best_conf < min_confidence or not best_text.strip():
-        text_psm4, conf_psm4 = _run_tesseract(pil_otsu, psm=4)
-        if conf_psm4 > best_conf or (not best_text.strip() and text_psm4.strip()):
-            log.info("PSM-4 retry improved confidence: %.1f → %.1f", best_conf, conf_psm4)
-            best_text, best_conf = text_psm4, conf_psm4
+    if best.confidence < min_confidence or not best.text.strip():
+        res_psm4 = _run_tesseract(pil_otsu, psm=4)
+        if res_psm4.confidence > best.confidence or (not best.text.strip() and res_psm4.text.strip()):
+            log.info("PSM-4 retry improved confidence: %.1f → %.1f", best.confidence, res_psm4.confidence)
+            best = res_psm4
 
     # Fallback 2: If still below min_confidence, try PSM 11 (sparse text)
-    if best_conf < min_confidence or not best_text.strip():
-        text_psm11, conf_psm11 = _run_tesseract(pil_otsu, psm=11)
-        if conf_psm11 > best_conf or (not best_text.strip() and text_psm11.strip()):
-            log.info("PSM-11 retry improved confidence: %.1f → %.1f", best_conf, conf_psm11)
-            best_text, best_conf = text_psm11, conf_psm11
+    if best.confidence < min_confidence or not best.text.strip():
+        res_psm11 = _run_tesseract(pil_otsu, psm=11)
+        if res_psm11.confidence > best.confidence or (not best.text.strip() and res_psm11.text.strip()):
+            log.info("PSM-11 retry improved confidence: %.1f → %.1f", best.confidence, res_psm11.confidence)
+            best = res_psm11
 
     # Fallback 3: If still below min_confidence, try adaptive thresholding
-    if best_conf < min_confidence or not best_text.strip():
+    if best.confidence < min_confidence or not best.text.strip():
         preprocessed_adapt = preprocess_adaptive(img)
         pil_adapt = cv2_to_pil(preprocessed_adapt)
-        text_adapt, conf_adapt = _run_tesseract(pil_adapt, psm=psm_primary)
-        if conf_adapt > best_conf or (not best_text.strip() and text_adapt.strip()):
-            log.info("Adaptive threshold retry improved confidence: %.1f → %.1f", best_conf, conf_adapt)
-            best_text, best_conf = text_adapt, conf_adapt
+        res_adapt = _run_tesseract(pil_adapt, psm=psm_primary)
+        if res_adapt.confidence > best.confidence or (not best.text.strip() and res_adapt.text.strip()):
+            log.info("Adaptive threshold retry improved confidence: %.1f → %.1f", best.confidence, res_adapt.confidence)
+            best = res_adapt
 
-    if not best_text.strip():
+    if not best.text.strip():
         log.warning(
             "Tesseract returned no words with positive confidence (image size: %s)",
             img.size,
         )
-        return "", 0.0
+        return OCRResult("", 0.0, [])
 
-    log.debug("OCR: %d characters, mean_conf=%.1f", len(best_text), best_conf)
-    return best_text, best_conf
+    log.debug("OCR: %d characters, mean_conf=%.1f", len(best.text), best.confidence)
+    return best
 
 
 _OCR_BYTES_CACHE: Dict[str, Tuple[str, float]] = {}

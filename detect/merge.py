@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 import logging
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from detect.rules import RawHit
 
@@ -177,6 +177,7 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
     from detect.rules import run_rules
     from detect.ner import run_ner
     from detect.context import run_context
+    from detect.suspect import find_suspect_ocr_hits
 
     if chunk.is_blocked() or not chunk.text.strip():
         return []
@@ -203,6 +204,13 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
     context_new, all_hits = run_context(
         chunk.location, chunk.text, all_hits, config)
     all_hits.extend(context_new)
+
+    # Item 1: fail-closed redaction for low-confidence OCR lines
+    suspect_hits = find_suspect_ocr_hits(chunk, config)
+    if suspect_hits:
+        log.debug("SUSPECT_OCR: %d hits from low-confidence OCR lines in %s",
+                  len(suspect_hits), chunk.location)
+        all_hits.extend(suspect_hits)
 
     # Re-derive raw_value from chunk text for span-merged hits
     entities = merge_hits(all_hits, chunk.file, chunk.location, config)

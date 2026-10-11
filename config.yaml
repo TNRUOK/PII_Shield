@@ -30,6 +30,7 @@ enabled_entities:
   - GOVERNMENT_ID
   - IP_ADDRESS
   - PERSON
+  - SUSPECT_OCR
   # - LOCATION   # off by default — high false-positive rate on city/company names
 
 # Denylist for PERSON entities in NER (reject corporate/product/generic terms)
@@ -53,8 +54,12 @@ context:
   labelled_name_confidence: 0.85 # confidence for Prepared-by / Author: / Owner: patterns
   unlabelled_name_col_confidence: 0.60  # unlabelled caps strings in a "Name" column
 
+# Low-confidence OCR fail-closed settings (Item 1)
+ocr_suspect_conf: 70
+ocr_suspect_redaction: true
+
 sensitivity_map:
-  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN]
+  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR]
   Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, DATE_OF_BIRTH, PERSON]
   Low:    [IP_ADDRESS, GOVERNMENT_ID]
 

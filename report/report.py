@@ -66,6 +66,7 @@ def build_file_summary(
         "ocr_chunks": ocr_count,
         "blocked_chunks": blocked_count,
         "pii_count": len(entities),
+        "suspect_ocr_count": pii_by_type.get("SUSPECT_OCR", 0),
         "pii_by_type": pii_by_type,
         "risk_level": _file_risk(entities),
         "structure_retention_score": structure_score,
@@ -146,20 +147,21 @@ def generate_report(
 def print_summary_table(file_summaries: List[Dict[str, Any]]) -> str:
     """Return a human-readable summary table as a string."""
     lines = []
-    lines.append("\n" + "=" * 90)
+    lines.append("\n" + "=" * 95)
     lines.append(f"OCR Engine (Tesseract): {'Available' if is_tesseract_available() else 'Not Installed'}")
-    lines.append("-" * 90)
-    lines.append(f"{'File':<30} {'Chunks':>7} {'Blk':>4} {'PII':>5} {'Risk':<8} {'Struct':>7} {'Safe?':<6}")
-    lines.append("-" * 90)
+    lines.append("-" * 95)
+    lines.append(f"{'File':<28} {'Chunks':>6} {'Blk':>4} {'PII':>5} {'Susp':>5} {'Risk':<7} {'Struct':>7} {'Safe?':<6}")
+    lines.append("-" * 95)
     for fs in file_summaries:
-        name = Path(fs["file"]).name[:28]
+        name = Path(fs["file"]).name[:26]
         struct = f"{fs['structure_retention_score']:.2f}" if fs.get("structure_retention_score") is not None else "  N/A"
         safe = "✅ YES" if fs["leak_check"]["downstream_safe"] else "❌ NO "
+        susp = fs.get("suspect_ocr_count", 0)
         lines.append(
-            f"{name:<30} {fs['chunk_count']:>7} {fs['blocked_chunks']:>4} "
-            f"{fs['pii_count']:>5} {fs['risk_level']:<8} {struct:>7} {safe:<6}"
+            f"{name:<28} {fs['chunk_count']:>6} {fs['blocked_chunks']:>4} "
+            f"{fs['pii_count']:>5} {susp:>5} {fs['risk_level']:<7} {struct:>7} {safe:<6}"
         )
-    lines.append("=" * 90)
+    lines.append("=" * 95)
     table = "\n".join(lines)
     print(table)
     return table

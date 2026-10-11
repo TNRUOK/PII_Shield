@@ -6,7 +6,7 @@ A Chunk represents one logical text block from any document format.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Tuple
 
 
 @dataclass
@@ -34,6 +34,7 @@ class Chunk:
     order_index: int
     blocked_reason: Optional[str] = None
     low_confidence: bool = False
+    line_confidences: Optional[List[Tuple[str, float]]] = None
 
     def is_blocked(self) -> bool:
         return self.method == "blocked"

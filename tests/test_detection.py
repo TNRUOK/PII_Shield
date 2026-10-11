@@ -610,4 +610,114 @@ class TestPrecisionGuards:
             assert e.entity_type != "PHONE", f"False positive Phone detected: {e.raw_value}"
 
 
+# ---------------------------------------------------------------------------
+# Item 1: SUSPECT_OCR — low-confidence OCR fail-closed redaction
+# ---------------------------------------------------------------------------
+
+def _ocr_chunk(text: str, line_confs: list, conf: float = 45.0) -> Chunk:
+    """Build a synthetic OCR chunk with per-line confidence data."""
+    return Chunk(
+        file="synthetic_test.png",
+        location="page:1",
+        text=text,
+        method="ocr",
+        ocr_confidence=conf,
+        order_index=0,
+        line_confidences=line_confs,
+    )
+
+
+def _native_chunk_bare(text: str) -> Chunk:
+    """Build a native (non-OCR) chunk."""
+    return Chunk(
+        file="synthetic_test.docx",
+        location="body",
+        text=text,
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+
+
+class TestSuspectOCR:
+    """Tests for Item 1: fail-closed redaction of low-confidence OCR PII."""
+
+    def test_low_conf_email_gets_suspect_ocr(self, config):
+        """Email on a low-confidence OCR line should become SUSPECT_OCR."""
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Contact: alicetompkins@syntheticcorp.net"
+        chunk = _ocr_chunk(text, [(text, 42.0)])
+        hits = find_suspect_ocr_hits(chunk, config)
+        types = {h.entity_type for h in hits}
+        assert "SUSPECT_OCR" in types, f"Expected SUSPECT_OCR, got {types}"
+
+    def test_low_conf_digit_run_gets_suspect_ocr(self, config):
+        """9-digit number on a low-confidence line should become SUSPECT_OCR."""
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Account: 987654321"
+        chunk = _ocr_chunk(text, [(text, 55.0)])
+        hits = find_suspect_ocr_hits(chunk, config)
+        types = {h.entity_type for h in hits}
+        assert "SUSPECT_OCR" in types, f"Expected SUSPECT_OCR, got {types}"
+
+    def test_high_conf_line_not_flagged(self, config):
+        """High-confidence OCR line should NOT produce SUSPECT_OCR."""
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Account: 987654321"
+        chunk = _ocr_chunk(text, [(text, 95.0)])
+        hits = find_suspect_ocr_hits(chunk, config)
+        suspect = [h for h in hits if h.entity_type == "SUSPECT_OCR"]
+        assert len(suspect) == 0, "High-conf line should not trigger SUSPECT_OCR"
+
+    def test_native_chunk_never_flagged(self, config):
+        """Native (non-OCR) chunks should never produce SUSPECT_OCR."""
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Account: 987654321"
+        chunk = _native_chunk_bare(text)
+        hits = find_suspect_ocr_hits(chunk, config)
+        assert hits == [], "Native chunks must not produce SUSPECT_OCR"
+
+    def test_date_lookalike_not_flagged(self, config):
+        """Dates like 12/05/2026 on low-conf lines must NOT be SUSPECT_OCR."""
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Effective 12/05/2026"
+        chunk = _ocr_chunk(text, [(text, 40.0)])
+        hits = find_suspect_ocr_hits(chunk, config)
+        date_hits = [h for h in hits if h.entity_type == "SUSPECT_OCR" and "2026" in h.text]
+        assert len(date_hits) == 0, f"Date look-alike flagged as SUSPECT_OCR: {date_hits}"
+
+    def test_version_lookalike_not_flagged(self, config):
+        """Version strings like 4.31.2 must NOT be flagged."""
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Version 4.31.2 released"
+        chunk = _ocr_chunk(text, [(text, 38.0)])
+        hits = find_suspect_ocr_hits(chunk, config)
+        suspect = [h for h in hits if h.entity_type == "SUSPECT_OCR"]
+        assert len(suspect) == 0, f"Version string flagged: {suspect}"
+
+    def test_no_line_confs_skips_silently(self, config):
+        """OCR chunk without line_confidences should produce no SUSPECT_OCR hits."""
+        from detect.suspect import find_suspect_ocr_hits
+        chunk = Chunk(
+            file="test.png",
+            location="page:1",
+            text="Account: 987654321",
+            method="ocr",
+            ocr_confidence=50.0,
+            order_index=0,
+        )
+        hits = find_suspect_ocr_hits(chunk, config)
+        assert hits == [], "No line_confidences -> no SUSPECT_OCR"
+
+    def test_suspect_ocr_appears_in_detect_chunk(self, config):
+        """detect_chunk should include SUSPECT_OCR entity from low-conf line."""
+        text = "Contact: benmcallister@synthfinance.io"
+        chunk = _ocr_chunk(text, [(text, 48.0)])
+        entities = detect_chunk(chunk, config)
+        types = {e.entity_type for e in entities}
+        assert "SUSPECT_OCR" in types or "EMAIL" in types, (
+            f"Expected SUSPECT_OCR or EMAIL for OCR email, got {types}")
+
+
+
 

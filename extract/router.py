@@ -125,7 +125,9 @@ def route(file_path: str, config: dict) -> List[Chunk]:
         ocr_min_conf = config["profiles"][profile_name]["ocr_min_confidence"]
         try:
             img = Image.open(str(path))
-            text, mean_conf = ocr_image(img, min_confidence=ocr_min_conf, config=config)
+            res = ocr_image(img, min_confidence=ocr_min_conf, config=config)
+            text, mean_conf = res
+            line_confs = getattr(res, "line_confidences", None)
             if not is_tesseract_available():
                 return _blocked(file_path, "Tesseract not installed")
             if not text.strip() and mean_conf == 0.0:
@@ -140,6 +142,7 @@ def route(file_path: str, config: dict) -> List[Chunk]:
                     order_index=0,
                     blocked_reason=f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}",
                     low_confidence=True,
+                    line_confidences=line_confs,
                 )]
             return [Chunk(
                 file=file_path,
@@ -148,6 +151,7 @@ def route(file_path: str, config: dict) -> List[Chunk]:
                 method="ocr",
                 ocr_confidence=mean_conf,
                 order_index=0,
+                line_confidences=line_confs,
             )]
         except Exception as exc:
             return _blocked(file_path, f"Cannot open image: {exc}")

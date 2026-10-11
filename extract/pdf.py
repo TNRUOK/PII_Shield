@@ -56,7 +56,7 @@ def _render_page(page: fitz.Page, dpi: int = OCR_RENDER_DPI) -> Tuple[Image.Imag
     return img, sha1
 
 
-def _ocr_page_worker(args: tuple) -> tuple[int, str, float, str, Optional[str]]:
+def _ocr_page_worker(args: tuple) -> tuple[int, str, float, str, Optional[str], Optional[list]]:
     """Worker function for parallel OCR execution across multiple worker processes."""
     file_path, page_num, ocr_min_conf, config, dpi = args
     os.environ["OMP_THREAD_LIMIT"] = "1"
@@ -73,10 +73,12 @@ def _ocr_page_worker(args: tuple) -> tuple[int, str, float, str, Optional[str]]:
         sha1 = hashlib.sha1(pix.samples).hexdigest()
         pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         doc.close()
-        ocr_text, mean_conf = ocr_image(pil_img, min_confidence=ocr_min_conf, config=config)
-        return page_num, ocr_text, mean_conf, sha1, None
+        ocr_res = ocr_image(pil_img, min_confidence=ocr_min_conf, config=config)
+        ocr_text, mean_conf = ocr_res
+        line_confs = getattr(ocr_res, "line_confidences", None)
+        return page_num, ocr_text, mean_conf, sha1, None, line_confs
     except Exception as exc:
-        return page_num, "", 0.0, "", str(exc)
+        return page_num, "", 0.0, "", str(exc), None
 
 
 def _metadata_chunks(doc: fitz.Document, file: str, order_start: int) -> List[Chunk]:
@@ -169,19 +171,22 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
     doc.close()
 
     # Second pass: parallel OCR for uncached pages
-    ocr_results: Dict[int, Tuple[str, float, Optional[str]]] = {}
-    for p_num, (text, conf) in cached_ocr_results.items():
-        ocr_results[p_num] = (text, conf, None)
+    ocr_results: Dict[int, Tuple[str, float, Optional[str], Optional[list]]] = {}
+    for p_num, entry in cached_ocr_results.items():
+        text = entry[0]
+        conf = entry[1]
+        line_confs = entry[2] if len(entry) > 2 else None
+        ocr_results[p_num] = (text, conf, None, line_confs)
 
     if pages_to_ocr:
         if len(pages_to_ocr) == 1:
             p_num = pages_to_ocr[0]
-            _, ocr_text, mean_conf, sha1, err = _ocr_page_worker(
+            _, ocr_text, mean_conf, sha1, err, line_confs = _ocr_page_worker(
                 (file_path, p_num, ocr_min_conf, config, OCR_RENDER_DPI)
             )
             if sha1:
-                _PDF_PAGE_CACHE[sha1] = (ocr_text, mean_conf)
-            ocr_results[p_num] = (ocr_text, mean_conf, err)
+                _PDF_PAGE_CACHE[sha1] = (ocr_text, mean_conf, line_confs)
+            ocr_results[p_num] = (ocr_text, mean_conf, err, line_confs)
         else:
             workers = min(4, os.cpu_count() or 1, len(pages_to_ocr))
             worker_args = [
@@ -191,10 +196,10 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 results = list(executor.map(_ocr_page_worker, worker_args))
-            for p_num, ocr_text, mean_conf, sha1, err in results:
+            for p_num, ocr_text, mean_conf, sha1, err, line_confs in results:
                 if sha1:
-                    _PDF_PAGE_CACHE[sha1] = (ocr_text, mean_conf)
-                ocr_results[p_num] = (ocr_text, mean_conf, err)
+                    _PDF_PAGE_CACHE[sha1] = (ocr_text, mean_conf, line_confs)
+                ocr_results[p_num] = (ocr_text, mean_conf, err, line_confs)
 
     # Reconstruct chunks in strict deterministic page order
     total_pages = len(native_pages) + len(ocr_results)
@@ -211,7 +216,7 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
             ))
             order += 1
         elif page_num in ocr_results:
-            ocr_text, mean_conf, err = ocr_results[page_num]
+            ocr_text, mean_conf, err, line_confs = ocr_results[page_num]
             if err:
                 log.error("OCR failed on page %d of %s: %s", page_num + 1, path.name, err)
                 chunks.append(Chunk(
@@ -255,6 +260,7 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                     order_index=order,
                     blocked_reason=f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}",
                     low_confidence=True,
+                    line_confidences=line_confs,
                 ))
             else:
                 chunks.append(Chunk(
@@ -264,6 +270,7 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
                     method="ocr",
                     ocr_confidence=mean_conf,
                     order_index=order,
+                    line_confidences=line_confs,
                 ))
             order += 1
 
