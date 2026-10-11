@@ -1,0 +1,5 @@
+DejaVuSans.ttf bundled for testing only.
+Licence: DejaVu Fonts are (c) Bitstream; permissive open-font licence.
+See https://dejavu-fonts.github.io/License.html
+On Linux CI the system /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf is preferred.
+On this Windows build machine the system Arial.ttf was used as a substitute.

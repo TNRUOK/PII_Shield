@@ -11,6 +11,48 @@ from extract.router import route
 from extract.models import Chunk
 
 
+# ---------------------------------------------------------------------------
+# Portable TrueType font helper (Issue 2)
+# ---------------------------------------------------------------------------
+
+_FONT_SEARCH_PATHS = [
+    # 1. Repo-bundled (cross-platform; Bitstream Vera / DejaVu, open licence)
+    Path(__file__).parent / "assets" / "DejaVuSans.ttf",
+    # 2. Common Windows system fonts
+    Path(r"C:/Windows/Fonts/arial.ttf"),
+    Path(r"C:/Windows/Fonts/verdana.ttf"),
+    Path(r"C:/Windows/Fonts/segoeui.ttf"),
+    # 3. Common Linux system fonts (DejaVu, Liberation)
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+    Path("/usr/share/fonts/liberation/LiberationSans-Regular.ttf"),
+    Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),
+    # 4. macOS
+    Path("/Library/Fonts/Arial.ttf"),
+    Path("/System/Library/Fonts/Helvetica.ttc"),
+]
+
+
+def _find_font(size: int = 24):
+    """Return an ImageFont.FreeTypeFont at *size* pt using the first available
+    TrueType font from *_FONT_SEARCH_PATHS*.  If none is found, the calling
+    test is skipped with a descriptive message.  Never falls back to the
+    default bitmap font (which OCR cannot read reliably).
+    """
+    from PIL import ImageFont
+    for path in _FONT_SEARCH_PATHS:
+        if path.exists():
+            try:
+                return ImageFont.truetype(str(path), size)
+            except Exception:
+                continue
+    pytest.skip(
+        "No usable TrueType font found on this system. "
+        "Install DejaVu fonts (e.g. `apt-get install fonts-dejavu`) or place "
+        "tests/assets/DejaVuSans.ttf in the repo."
+    )
+
+
 @pytest.fixture(scope="module")
 def pdf_chunks(config, synthetic_dir):
     pdf = synthetic_dir / "scanned_policy.pdf"
@@ -255,10 +297,7 @@ class TestDeskew:
         gt_text = " ".join(text_lines)
         img = Image.new("RGB", (1000, 500), (255, 255, 255))
         draw = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.truetype("arial.ttf", 24)
-        except OSError:
-            font = ImageFont.load_default()
+        font = _find_font(24)  # portable helper — skips if no TTF available
 
         y = 50
         for line in text_lines:
@@ -289,10 +328,7 @@ class TestOCRPipeline:
         ]
         img = Image.new("RGB", (900, 400), (255, 255, 255))
         draw = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.truetype("arial.ttf", 24)
-        except OSError:
-            font = ImageFont.load_default()
+        font = _find_font(24)  # portable helper — skips if no TTF available
 
         y = 30
         for line in lines:
