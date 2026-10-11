@@ -218,9 +218,11 @@ def detect_chunk(
             chunk.location, chunk.text, all_hits, config)
         all_hits.extend(context_new)
 
-    # Item 1: fail-closed redaction for low-confidence OCR lines
+    # Item 1: fail-closed redaction for low-confidence OCR lines.
+    # Pass all_hits so suspect detection only fills gaps not covered by typed entities.
+    # Typed hits (PHONE, EMAIL, SSN, …) always have priority over SUSPECT_OCR.
     if use_suspect:
-        suspect_hits = find_suspect_ocr_hits(chunk, config)
+        suspect_hits = find_suspect_ocr_hits(chunk, config, existing_hits=all_hits)
         if suspect_hits:
             log.debug("SUSPECT_OCR: %d hits from low-confidence OCR lines in %s",
                       len(suspect_hits), chunk.location)
