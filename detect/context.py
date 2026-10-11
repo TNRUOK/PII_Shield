@@ -46,6 +46,37 @@ _NAME_HEADER_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
+# Words that — when present in a header — VETO any keyword match.
+# An organisational-structure word beats a person-keyword match.
+_HEADER_EXCLUSION_RE = re.compile(
+    r"\b(group|groups|team|teams|department|departments|dept|role|roles|title|"
+    r"permission|permissions|description|type|status|workflow|stage)\b",
+    re.IGNORECASE,
+)
+
+
+def _header_is_name_column(header: str) -> bool:
+    """Return True iff *header* should be treated as a person-name column.
+
+    Rules (in order):
+    1. If any exclusion word is present (word-boundary), return False.
+    2. If a name-keyword is present (word-boundary), return True.
+    """
+    if _HEADER_EXCLUSION_RE.search(header):
+        return False
+    return bool(_NAME_HEADER_KEYWORDS.search(header))
+
+
+def _header_is_pii_column(header: str) -> bool:
+    """Return True iff *header* warrants a PII confidence boost.
+
+    Same veto logic: exclusion words prevent an email/phone column in a
+    workflow table (e.g. 'Group Status') from getting a spurious boost.
+    """
+    if _HEADER_EXCLUSION_RE.search(header):
+        return False
+    return bool(_HEADER_PII_KEYWORDS.search(header))
+
 # Labelled keys for key-value formats
 _LABEL_KEYS = (
     r"(?:prepared\s+by|approved\s+by|author(?:\(s\))?|owner|submitted\s+by|signed\s+by|"
@@ -142,10 +173,10 @@ def run_context(
     # --- Strategy 1: Table column header boost ---
     if is_table_chunk:
         headers = _parse_headers_from_location(chunk_location)
-        # Determine which header columns are PII-relevant
+        # Determine which header columns are PII-relevant (exclusion veto applied)
         pii_col_indices = {
             i for i, h in enumerate(headers)
-            if _HEADER_PII_KEYWORDS.search(h)
+            if _header_is_pii_column(h)
         }
 
         for hit in updated:
@@ -155,10 +186,10 @@ def run_context(
                 if "context" not in hit.method:
                     hit.method = hit.method + "+context"
 
-        # --- Strategy 3: Unlabelled names in a name column ---
+        # --- Strategy 3: Unlabelled names in a name column (exclusion veto applied) ---
         name_col_indices = {
             i for i, h in enumerate(headers)
-            if _NAME_HEADER_KEYWORDS.search(h)
+            if _header_is_name_column(h)
         }
         if name_col_indices:
             cells = chunk_text.split("|")
