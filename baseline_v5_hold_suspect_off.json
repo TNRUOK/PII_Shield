@@ -1,0 +1,85 @@
+{
+  "entity_metrics": {
+    "EMAIL": {
+      "tp": 6,
+      "fp": 2,
+      "fn": 2,
+      "precision": 0.75,
+      "recall": 0.75,
+      "f1": 0.75
+    },
+    "EMPLOYEE_ID": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "IP_ADDRESS": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "PERSON": {
+      "tp": 21,
+      "fp": 2,
+      "fn": 0,
+      "precision": 0.913,
+      "recall": 1.0,
+      "f1": 0.9545
+    },
+    "PHONE": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "SSN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6667
+    },
+    "OVERALL": {
+      "tp": 36,
+      "fp": 5,
+      "fn": 4,
+      "precision": 0.878,
+      "recall": 0.9,
+      "f1": 0.8889
+    }
+  },
+  "structure_retention": {
+    "org_pack.pptx": 0.983,
+    "scanned_policy.pdf": 0.9201,
+    "training_guide.docx": 0.8929
+  },
+  "throughput": [
+    {
+      "file": "org_pack.pptx",
+      "seconds": 3.618494499940425,
+      "pages": 2,
+      "ppm": 33.16296321632537
+    },
+    {
+      "file": "scanned_policy.pdf",
+      "seconds": 1.433205199893564,
+      "pages": 4,
+      "ppm": 167.4568303393146
+    },
+    {
+      "file": "training_guide.docx",
+      "seconds": 0.6912032999098301,
+      "pages": 1,
+      "ppm": 86.80514113261209
+    }
+  ]
+}

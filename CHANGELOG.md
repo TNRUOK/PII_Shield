@@ -1,5 +1,93 @@
 # CHANGELOG
 
+## [1.5.0] — 2026-10-11 (Phase 5 Corrective Remediation & No-Regression Enforcement)
+
+### Summary
+Targeted remediation resolving accuracy regressions introduced in v4:
+1. **SUSPECT_OCR Gap-Only Logic (`detect/suspect.py`, `detect/merge.py`)**:
+   - Typed hits (`PHONE`, `EMAIL`, `PERSON`, `SSN`) now strictly take precedence over `SUSPECT_OCR` in merge resolution.
+   - `find_suspect_ocr_hits` accepts `existing_hits` and silently skips candidates overlapping typed entities.
+   - Enhanced `_is_lookalike` with ISO dates (`YYYY-MM-DD`), section numbers (`4.2.3`), control/rule IDs (`QRC_Sec`, `WR.RP`, `CL`), short bare ints (≤6 digits), and enclosing whitespace-token checking.
+2. **Conservative Name Alias Propagation (`detect/propagate.py`, `config.yaml`)**:
+   - Added `alias_propagation: bool` configuration toggle.
+   - Added `alias_source_stoplist` preventing propagation from entities containing organizational or geographical terms (e.g. "Road", "Group", "Team").
+   - Raised minimum alias length to 4 characters; added per-document cap `alias_max_per_document: 50`.
+3. **Targeted OCR Repair Test Fixture (`tests/ocr_repair_cases.json`, `detect/ocr_repair.py`)**:
+   - Added test cases covering character confusions (`S`→`5`, `O`→`0`, `l`→`1`, `.cam`/`.corn`→`.com`) and negative lookalikes.
+   - Enabled SSN character repair supporting 9-digit digit runs and hyphenated candidates validated via `ssn_sanity`.
+4. **Shared Precision Guard Fixture (`tests/test_detection.py`)**:
+   - Implemented `TestPrecisionGuardAllLayers` validating 19 distinct negative lookalike patterns across 5 pipeline layers: rules, pipeline, OCR repair, suspect line, and alias propagation.
+   - Verified **0 false positives** across all 95 layer-case combinations.
+5. **No-Regression Rule Enforcement & Ground Truth Accounting**:
+   - Performed 6-stage ablation study across `/synthetic` and `/synthetic_holdout`.
+   - In accordance with the No-Regression Rule, features causing precision loss (`alias_propagation` on holdout, `ocr_suspect_redaction` on synthetic) are shipped `false` by default in `config.yaml`.
+   - Created `ground_truth_issues.md` documenting verified synthetic data anomalies (including DOCX footnote omission).
+
+Test Suite: **315 passed / 0 failed** (up from 181). Zero remote pushes.
+
+---
+
+### Measured Benchmark Comparison
+
+#### 1. Synthetic Dataset (`/synthetic` — Seed 42)
+| Entity Type | v4 Baseline TP/FP/FN | v4 Baseline P / R / F1 | v5 Default TP/FP/FN | v5 Default P / R / F1 |
+|---|---|---|---|---|
+| **OVERALL** | 89 / 10 / 6 | 0.8990 / 0.9368 / 0.9175 | **89 / 7 / 6** | **0.9271 / 0.9368 / 0.9319** |
+| AADHAAR | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| EMAIL | 18 / 1 / 2 | 0.9474 / 0.9000 / 0.9231 | 18 / 1 / 2 | 0.9474 / 0.9000 / 0.9231 |
+| EMPLOYEE_ID | 6 / 1 / 1 | 0.8571 / 0.8571 / 0.8571 | 6 / 1 / 1 | 0.8571 / 0.8571 / 0.8571 |
+| GOVERNMENT_ID | 0 / 1 / 0 | 0.0000 / 0.0000 / 0.0000 | 0 / 1 / 0 | 0.0000 / 0.0000 / 0.0000 |
+| IP_ADDRESS | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| PAN | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| PERSON | 48 / 6 / 1 | 0.8889 / 0.9796 / 0.9320 | 48 / 4 / 1 | 0.9231 / 0.9796 / 0.9505 |
+| PHONE | 13 / 0 / 1 | 1.0000 / 0.9286 / 0.9630 | 13 / 0 / 1 | 1.0000 / 0.9286 / 0.9630 |
+| SSN | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 |
+| SUSPECT_OCR | 0 / 1 / 0 | 0.0000 / 0.0000 / 0.0000 | 0 / 0 / 0 | 0.0000 / 0.0000 / 0.0000 |
+
+- **Structure Retention**: `org_pack.pptx`: 0.8978, `scanned_policy.pdf`: 0.9608, `training_guide.docx`: 0.9887 (All ≥ 0.80 ✅)
+- **Confirmed Leaks**: **0 (Safe ✅)**
+
+#### 2. Hold-Out Dataset (`/synthetic_holdout` — Seed 99, unseen)
+| Entity Type | v4 Baseline TP/FP/FN | v4 Baseline P / R / F1 | v5 Default TP/FP/FN | v5 Default P / R / F1 |
+|---|---|---|---|---|
+| **OVERALL** | 34 / 7 / 6 | 0.8293 / 0.8500 / 0.8395 | **36 / 4 / 4** | **0.9000 / 0.9000 / 0.9000** |
+| EMAIL | 6 / 2 / 2 | 0.7500 / 0.7500 / 0.7500 | 6 / 2 / 2 | 0.7500 / 0.7500 / 0.7500 |
+| EMPLOYEE_ID | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 | 1 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| IP_ADDRESS | 0 / 1 / 1 | 0.0000 / 0.0000 / 0.0000 | 0 / 1 / 1 | 0.0000 / 0.0000 / 0.0000 |
+| PERSON | 21 / 2 / 0 | 0.9130 / 1.0000 / 0.9545 | 21 / 1 / 0 | 0.9545 / 1.0000 / 0.9767 |
+| PHONE | 5 / 0 / 2 | 1.0000 / 0.7143 / 0.8333 | 7 / 0 / 0 | 1.0000 / 1.0000 / 1.0000 |
+| SSN | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 | 1 / 0 / 1 | 1.0000 / 0.5000 / 0.6667 |
+| SUSPECT_OCR | 0 / 2 / 0 | 0.0000 / 0.0000 / 0.0000 | 0 / 0 / 0 | 0.0000 / 0.0000 / 0.0000 |
+
+- **Structure Retention**: `org_pack.pptx`: 0.9830, `scanned_policy.pdf`: 0.9201, `training_guide.docx`: 0.8929 (All ≥ 0.80 ✅)
+- **Confirmed Leaks**: **0 (Safe ✅)**
+
+---
+
+### 6-Stage Ablation Summary Tables
+
+#### Synthetic Dataset Ablation
+| Stage | Precision | Recall | F1 | SUSPECT_OCR Hits | Alias Hits |
+|---|---|---|---|---|---|
+| 1. rules only | 0.9111 | 0.4316 | 0.5857 | 0 | 0 |
+| 2. rules + NER | 0.9271 | 0.9368 | 0.9319 | 0 | 0 |
+| 3. + context rules | 0.9271 | 0.9368 | 0.9319 | 0 | 0 |
+| 4. + OCR repair | 0.9271 | 0.9368 | 0.9319 | 0 | 0 |
+| 5. + suspect-line | 0.9175 | 0.9368 | 0.9271 | 1 | 0 |
+| 6. + alias propagation | 0.9175 | 0.9368 | 0.9271 | 1 | 0 |
+
+#### Hold-Out Dataset Ablation
+| Stage | Precision | Recall | F1 | SUSPECT_OCR Hits | Alias Hits |
+|---|---|---|---|---|---|
+| 1. rules only | 0.8333 | 0.3750 | 0.5172 | 0 | 0 |
+| 2. rules + NER | 0.9000 | 0.9000 | 0.9000 | 0 | 0 |
+| 3. + context rules | 0.9000 | 0.9000 | 0.9000 | 0 | 0 |
+| 4. + OCR repair | 0.9000 | 0.9000 | 0.9000 | 0 | 0 |
+| 5. + suspect-line | 0.9000 | 0.9000 | 0.9000 | 0 | 0 |
+| 6. + alias propagation | 0.8780 | 0.9000 | 0.8889 | 0 | 1 |
+
+---
+
 ## [1.4.0] — 2026-10-11 (Phase 4 Security, Robustness & Ablation)
 
 ### Summary

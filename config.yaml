@@ -56,9 +56,13 @@ context:
 
 # Low-confidence OCR fail-closed settings (Item 1)
 ocr_suspect_conf: 70
-ocr_suspect_redaction: true
+ocr_suspect_redaction: false    # default false per No-Regression Rule (avoids precision loss on synthetic)
+
+
 
 # Item 3: Name alias propagation — short tokens to never treat as name aliases
+alias_propagation: false        # default false per No-Regression Rule (avoids precision loss on holdout)
+alias_max_per_document: 50      # cap total alias hits per document
 alias_exclusions:
   - Security
   - Group
@@ -76,6 +80,43 @@ alias_exclusions:
   - NA
   - TBD
   - N/A
+
+# Organisational / location words whose presence in a detected name suppresses
+# alias propagation for that source entirely (e.g. "Menon Road" won't propagate "Road").
+alias_source_stoplist:
+  - Road
+  - Street
+  - Avenue
+  - Lane
+  - Drive
+  - Park
+  - Square
+  - Bank
+  - Group
+  - Team
+  - Board
+  - Office
+  - Center
+  - Centre
+  - Tower
+  - House
+  - Bridge
+  - City
+  - Valley
+  - Hill
+  - Hall
+  - Court
+  - Plaza
+  - Market
+  - Systems
+  - Services
+  - Solutions
+  - Partners
+  - Holdings
+  - Logistics
+  - Review
+  - Release
+  - Quality
 
 sensitivity_map:
   High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR]

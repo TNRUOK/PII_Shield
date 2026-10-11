@@ -34,9 +34,9 @@
   },
   {
     "stage": "4. + OCR repair (Item 2)",
-    "precision": 0.9271,
+    "precision": 0.9175,
     "recall": 0.9368,
-    "f1": 0.9319,
+    "f1": 0.9271,
     "suspect_ocr_count": 0,
     "alias_redactions_count": 0,
     "tp": 0,
@@ -56,11 +56,11 @@
   },
   {
     "stage": "6. + alias propagation (Item 3)",
-    "precision": 0.899,
+    "precision": 0.9175,
     "recall": 0.9368,
-    "f1": 0.9175,
+    "f1": 0.9271,
     "suspect_ocr_count": 1,
-    "alias_redactions_count": 2,
+    "alias_redactions_count": 0,
     "tp": 0,
     "fp": 0,
     "fn": 0
