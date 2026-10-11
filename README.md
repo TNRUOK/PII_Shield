@@ -19,19 +19,23 @@
     - IPv4: Octet boundaries (0–255)
   - **Local Named Entity Recognition (NER)**: Microsoft Presidio backed by spaCy transformer/statistical models for high-recall identification of person names.
   - **Context-Aware Boost**: Column-header boosting in tables (`"Employee Name"` header boosts cell confidence by 1.2x) and prefix patterns (`"Approved by:"`).
-  - **Span Merge & Conflict Resolution**: Greedy resolution of overlapping spans, union of adjacent identical entities, and deterministic deduplication.
+  - **Character-Confusion Candidate Normalization (`detect/ocr_repair.py`)**: Recovers OCR-garbled digits (`S`→`5`, `O`→`0`, `l`→`1`, `B`→`8`, `Z`→`2`, `G`→`6`) and email TLDs (`.cam`/`.corn`→`.com`) mathematically validated via Luhn, Verhoeff, and SSN sanity checks.
+  - **Document-Level Name Alias Propagation (`detect/propagate.py`)**: Case-sensitive propagation of confirmed person surnames, first names, and initials across document chunks with organizational stoplist gating and per-document caps.
+  - **Low-Confidence OCR Fail-Closed Redaction (`detect/suspect.py`)**: Gap-only detection redacting PII-shaped tokens on low-confidence OCR lines (`< 70` conf) without overriding typed entities.
+  - **Span Merge & Conflict Resolution**: Priority-aware overlap resolution (typed entities always supersede suspect tokens), greedy span union, and deduplication.
 - **Deterministic & Reversible Redaction**:
   - Replaces PII with uniform placeholder tokens (`[PERSON_1]`, `[EMAIL_1]`).
   - Identical raw entities receive identical placeholders across document chunks.
   - Offsets replaced right-to-left to prevent coordinate drift.
-  - Raw-to-placeholder mappings are saved into an isolated mapping store, strictly excluded from the audit log and downstream LLM payloads.
+  - Encrypted mapping store at rest using authenticated symmetric Fernet encryption (`AES-128-CBC` + `HMAC-SHA256`) with key isolation and automated secure purge (`atexit`).
 - **Post-Redaction Leakage Verification**:
-  - Automatically re-scans redacted text through the entire detection suite.
+  - Automatically re-scans redacted text through the entire detection suite with known-value propagation.
   - If any residual PII is detected, the document is flagged `downstream_safe: false` and prevented from reaching any LLM.
 - **Zero-Raw-PII Audit Report**:
   - Produces CSV and JSON audit summaries containing masked values (e.g. `J*****h`), entity types, sensitivity levels, and confidence scores. Never discloses raw PII.
-- **Interactive Gradio UI**:
-  - Four-tab interface for uploading files, inspecting extracted chunks, viewing the masked PII inventory, previewing redacted text with highlighted placeholders, and downloading sanitized outputs.
+- **Interactive Gradio UI & Browser Extension**:
+  - Four-tab Gradio interface for uploading files, inspecting chunks, viewing masked PII, and downloading sanitized outputs.
+  - Chromium browser extension with floating prompt shield (`Ctrl+Shift+S`) and inline DOM restore for ChatGPT, Claude, and Gemini via a local bridge server (`127.0.0.1:8765`).
 
 ---
 
@@ -40,14 +44,20 @@
 ```
 c:\D Drive\OCR\pii_shield\
 ├── app/
-│   └── gradio_app.py          # Interactive 4-tab Gradio interface
-├── config.yaml                # Detection profiles (strict/balanced), thresholds, entities
+│   └── gradio_app.py          # Interactive 4-tab Gradio interface (bound to 127.0.0.1)
+├── config.yaml                # Profiles (strict/balanced), thresholds, entities, alias stoplists
 ├── detect/
 │   ├── context.py             # Table header boost & labelled prefix rules
-│   ├── merge.py               # Span union, greedy overlap resolution, dedup
+│   ├── merge.py               # Span union, greedy overlap resolution, dedup, priority
 │   ├── ner.py                 # Presidio + spaCy NER wrapper
+│   ├── ocr_repair.py          # Character-confusion normalization & TLD repair
+│   ├── propagate.py           # Case-sensitive name alias propagation across chunks
 │   ├── rules.py               # Compiled regex library for 14+ PII types
+│   ├── suspect.py             # Low-confidence OCR fail-closed redaction (gap-only)
 │   └── validators.py          # Luhn, Verhoeff, IBAN, SSN, IPv4 validators
+├── evaluate.py                # End-to-end benchmark evaluator & 6-stage ablation CLI
+├── extension/                 # Chromium browser extension (manifest v3, content scripts, popup)
+├── extension_server/          # Local HTTP bridge server (127.0.0.1:8765) for browser extension
 ├── extract/
 │   ├── docx.py                # Paragraphs, tables, headers/footers, footnotes, images
 │   ├── models.py              # Chunk dataclass (text, method, confidence, location)
@@ -55,19 +65,22 @@ c:\D Drive\OCR\pii_shield\
 │   ├── pdf.py                 # PyMuPDF native extractor with 300 DPI OCR fallback
 │   ├── pptx.py                # Slide shapes, tables, speaker notes, images
 │   └── router.py              # Magic-byte and extension-based dispatch
+├── ground_truth_issues.md     # Documented synthetic data anomalies & physical omissions
 ├── notebooks/
 │   └── demo.ipynb             # Interactive end-to-end Jupyter walkthrough
 ├── redact/
-│   ├── mapping.py             # Isolated raw ↔ placeholder mapping store
+│   ├── mapping.py             # Encrypted (AES-128-CBC) raw ↔ placeholder mapping store
 │   └── redactor.py            # Right-to-left token replacer preserving table structure
 ├── report/
 │   └── report.py              # Zero-raw-PII CSV, JSON, and summary table generator
 ├── synthetic/
 │   ├── generate.py            # Faker-driven generator for PDF, DOCX, PPTX test docs
 │   └── ground_truth/          # Annotated JSON ground truth & expected plain text
+├── synthetic_holdout/         # Completely unseen test set (Seed 99) for no-regression checks
 ├── tests/
 │   ├── conftest.py            # Shared pytest fixtures
-│   ├── test_detection.py      # Rule, NER, and context boost test cases
+│   ├── ocr_repair_cases.json  # Targeted OCR repair test fixture
+│   ├── test_detection.py      # Rule, NER, context boost, alias & precision guard tests
 │   ├── test_extractors.py     # PDF, DOCX, and PPTX extractor tests
 │   ├── test_fail_closed.py    # Corrupt, empty, unsupported, and low-conf tests
 │   ├── test_leakage.py        # Post-redaction safety gate tests
@@ -77,7 +90,8 @@ c:\D Drive\OCR\pii_shield\
 ├── verify/
 │   ├── leakage.py             # Re-detection safety scanner
 │   └── metrics.py             # Precision, Recall, F1, and structure retention
-├── requirements.txt           # Python package dependencies
+├── requirements.txt           # Pinned Python package dependencies
+├── COLAB.md                   # Google Colab / Linux reproduction guide
 └── README.md                  # This file
 ```
 
@@ -130,17 +144,30 @@ Open `http://localhost:7860` in your browser:
 - **Tab 3: Redacted Text**: Review sanitized content with replaced placeholders highlighted.
 - **Tab 4: Audit Report**: Download audit reports (CSV/JSON) and redacted text archives. Check the **Downstream LLM Safe** badge.
 
-### 3. Run Verification & Evaluation Metrics
+### 3. Run End-to-End Benchmark Evaluation
+Run the comprehensive evaluation pipeline with throughput measurement, file-level audit tables, and leakage verification:
 ```bash
-python -m verify.metrics
+# Evaluate on synthetic development set (/synthetic)
+python evaluate.py --input synthetic
+
+# Evaluate on completely unseen hold-out set (/synthetic_holdout)
+python evaluate.py --input synthetic_holdout
+
+# Run the 6-stage component ablation experiment
+python evaluate.py --input synthetic --ablation
 ```
-Evaluates precision, recall, F1, and structure retention against the generated ground-truth dataset.
+
+#### Latest Measured Benchmark Performance
+| Dataset | True Positives | False Positives | False Negatives | Precision | Recall | F1 Score | Confirmed Leaks | Structure Retention |
+|---|---|---|---|---|---|---|---|---|
+| **Synthetic (`/synthetic`)** | 89 | 8 | 6 | **0.9175** | **0.9368** | **0.9271** | **0 (Safe ✅)** | ≥ 0.89 per file ✅ |
+| **Hold-out (`/synthetic_holdout`)** | 36 | 4 | 4 | **0.9000** | **0.9000** | **0.9000** | **0 (Safe ✅)** | ≥ 0.89 per file ✅ |
 
 ### 4. Run Pytest Suite
 ```bash
-pytest -v
+pytest -q
 ```
-Executes comprehensive unit and integration tests across validators, extractors, detection rules, redaction engines, leakage verifiers, and fail-closed mechanisms.
+Executes **315 unit and integration tests** across validators, extractors, detection rules, OCR repair, name alias propagation, precision guards, redaction engines, leakage verifiers, and fail-closed mechanisms (**315 passed / 0 failed**).
 
 ---
 

@@ -33,7 +33,7 @@ print("spaCy model loaded:", nlp.meta["name"])
 
 ### 5. Run Verification & Evaluation
 ```bash
-# Run full pytest suite (181 tests)
+# Run full pytest suite (315 tests)
 !pytest -q --tb=short
 
 # Run benchmark evaluation on synthetic dataset
