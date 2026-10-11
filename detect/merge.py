@@ -169,10 +169,18 @@ def merge_hits(
     return entities
 
 
-def detect_chunk(chunk, config: dict) -> List[Entity]:
+def detect_chunk(
+    chunk,
+    config: dict,
+    *,
+    use_ner: bool = True,
+    use_context: bool = True,
+    use_suspect: bool = True,
+    use_repair: bool = True,
+) -> List[Entity]:
     """
-    Run all three detection layers on a single Chunk and return merged entities.
-    This is the main entry point called by the pipeline orchestrator.
+    Run detection layers on a single Chunk and return merged entities.
+    Optional flags allow ablating individual stages (Item 5).
     """
     from detect.rules import run_rules
     from detect.ner import run_ner
@@ -186,39 +194,45 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
     is_ocr = (chunk.method == "ocr") or (getattr(chunk, "ocr_confidence", None) is not None)
     rule_hits = run_rules(chunk.text, config, is_ocr=is_ocr)
 
-    # Run NER per table cell (not on the pipe-joined row) to prevent pipe delimiter confusion
-    if "table:" in chunk.location and "|" in chunk.text:
-        ner_hits = []
-        char_offset = 0
-        for cell in chunk.text.split("|"):
-            if cell.strip():
-                cell_hits = run_ner(cell, config)
-                for h in cell_hits:
-                    h.start += char_offset
-                    h.end += char_offset
-                    ner_hits.append(h)
-            char_offset += len(cell) + 1  # +1 for the pipe separator
-    else:
-        ner_hits = run_ner(chunk.text, config)
+    all_hits = list(rule_hits)
 
-    all_hits = rule_hits + ner_hits
-    context_new, all_hits = run_context(
-        chunk.location, chunk.text, all_hits, config)
-    all_hits.extend(context_new)
+    if use_ner:
+        # Run NER per table cell (not on the pipe-joined row) to prevent pipe delimiter confusion
+        if "table:" in chunk.location and "|" in chunk.text:
+            ner_hits = []
+            char_offset = 0
+            for cell in chunk.text.split("|"):
+                if cell.strip():
+                    cell_hits = run_ner(cell, config)
+                    for h in cell_hits:
+                        h.start += char_offset
+                        h.end += char_offset
+                        ner_hits.append(h)
+                char_offset += len(cell) + 1  # +1 for the pipe separator
+        else:
+            ner_hits = run_ner(chunk.text, config)
+        all_hits.extend(ner_hits)
+
+    if use_context:
+        context_new, all_hits = run_context(
+            chunk.location, chunk.text, all_hits, config)
+        all_hits.extend(context_new)
 
     # Item 1: fail-closed redaction for low-confidence OCR lines
-    suspect_hits = find_suspect_ocr_hits(chunk, config)
-    if suspect_hits:
-        log.debug("SUSPECT_OCR: %d hits from low-confidence OCR lines in %s",
-                  len(suspect_hits), chunk.location)
-        all_hits.extend(suspect_hits)
+    if use_suspect:
+        suspect_hits = find_suspect_ocr_hits(chunk, config)
+        if suspect_hits:
+            log.debug("SUSPECT_OCR: %d hits from low-confidence OCR lines in %s",
+                      len(suspect_hits), chunk.location)
+            all_hits.extend(suspect_hits)
 
     # Item 2: character-confusion normalisation for OCR candidate tokens
-    repair_hits = find_ocr_repair_hits(chunk, config)
-    if repair_hits:
-        log.debug("OCR_REPAIR: %d normalised hits in %s",
-                  len(repair_hits), chunk.location)
-        all_hits.extend(repair_hits)
+    if use_repair:
+        repair_hits = find_ocr_repair_hits(chunk, config)
+        if repair_hits:
+            log.debug("OCR_REPAIR: %d normalised hits in %s",
+                      len(repair_hits), chunk.location)
+            all_hits.extend(repair_hits)
 
     # Re-derive raw_value from chunk text for span-merged hits
     entities = merge_hits(all_hits, chunk.file, chunk.location, config)
@@ -229,3 +243,4 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
             ent.masked_value = _mask(ent.raw_value)
 
     return entities
+
