@@ -139,7 +139,22 @@ def process_files(
             ents = detect_chunk(chunk, config)
             file_entities.extend(ents)
 
+        # Item 3: propagate name aliases across document chunks
+        try:
+            from detect.propagate import propagate_name_aliases
+            person_ents = [e for e in file_entities if e.entity_type == "PERSON"]
+            chunk_texts = [c.text for c in chunks if not c.is_blocked()]
+            chunk_locs  = [c.location for c in chunks if not c.is_blocked()]
+            alias_ents = propagate_name_aliases(
+                chunk_texts, person_ents, file_entities, config,
+                file=file_path, locations=chunk_locs,
+            )
+            file_entities.extend(alias_ents)
+        except Exception:
+            pass  # Fail-safe: propagation never breaks the pipeline
+
         all_entities.extend(file_entities)
+
 
         # --- Redact ---
         mapping = PlaceholderMapping(file_path, mapping_dir)

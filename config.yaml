@@ -58,6 +58,25 @@ context:
 ocr_suspect_conf: 70
 ocr_suspect_redaction: true
 
+# Item 3: Name alias propagation — short tokens to never treat as name aliases
+alias_exclusions:
+  - Security
+  - Group
+  - Team
+  - Admin
+  - Manager
+  - Director
+  - Officer
+  - Committee
+  - Board
+  - Inc
+  - LLC
+  - Corp
+  - Ltd
+  - NA
+  - TBD
+  - N/A
+
 sensitivity_map:
   High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR]
   Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, DATE_OF_BIRTH, PERSON]

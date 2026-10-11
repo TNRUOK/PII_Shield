@@ -778,6 +778,80 @@ class TestOCRRepair:
         assert len(repair_hits) == 0, "No-change token should not emit ocr_repair hit"
 
 
+# ---------------------------------------------------------------------------
+# Item 3: Name alias propagation
+# ---------------------------------------------------------------------------
+
+class TestNameAliasPropagation:
+    """Tests for detect/propagate.py — document-level name alias propagation."""
+
+    def test_surname_alias_detected(self, config):
+        """Surname appearing later in doc should be flagged via alias propagation."""
+        from detect.propagate import propagate_name_aliases
+        from detect.merge import Entity
+        person_ent = Entity(
+            entity_type="PERSON", sensitivity="Medium", confidence=0.85,
+            methods=["ner"], file="test.docx", location="page:1",
+            start=0, end=14, raw_value="Jonathan Marsh",
+            masked_value="J***********h", placeholder="[PERSON_1]"
+        )
+        texts = ["Jonathan Marsh signed the agreement.", "Marsh confirmed receipt."]
+        locs = ["page:1", "page:2"]
+        alias_ents = propagate_name_aliases(
+            texts, [person_ent], [person_ent], config,
+            file="test.docx", locations=locs
+        )
+        alias_values = [e.raw_value for e in alias_ents]
+        assert any("Marsh" in v for v in alias_values), \
+            f"Expected surname alias hit, got {alias_values}"
+
+    def test_single_token_name_not_propagated(self, config):
+        """Single-token PERSON names should NOT produce alias propagation."""
+        from detect.propagate import propagate_name_aliases
+        from detect.merge import Entity
+        person_ent = Entity(
+            entity_type="PERSON", sensitivity="Medium", confidence=0.80,
+            methods=["ner"], file="test.docx", location="page:1",
+            start=0, end=4, raw_value="John",
+            masked_value="J**n", placeholder="[PERSON_1]"
+        )
+        texts = ["John reviewed the document.", "John approved it."]
+        locs = ["page:1", "page:2"]
+        alias_ents = propagate_name_aliases(
+            texts, [person_ent], [person_ent], config,
+            file="test.docx", locations=locs
+        )
+        assert alias_ents == [], f"Single-token name must not propagate: {alias_ents}"
+
+    def test_exclusion_list_respected(self, config):
+        """Tokens in alias_exclusions must not be flagged."""
+        from detect.propagate import propagate_name_aliases
+        from detect.merge import Entity
+        person_ent = Entity(
+            entity_type="PERSON", sensitivity="Medium", confidence=0.85,
+            methods=["ner"], file="test.docx", location="page:1",
+            start=0, end=14, raw_value="Security Group",
+            masked_value="S***********p", placeholder="[PERSON_1]"
+        )
+        texts = ["Security Group is responsible.", "The Security team reviewed it."]
+        locs = ["page:1", "page:2"]
+        alias_ents = propagate_name_aliases(
+            texts, [person_ent], [person_ent], config,
+            file="test.docx", locations=locs
+        )
+        assert alias_ents == [], f"Excluded tokens must not propagate: {alias_ents}"
+
+    def test_no_persons_returns_empty(self, config):
+        """No PERSON entities -> no alias propagation."""
+        from detect.propagate import propagate_name_aliases
+        alias_ents = propagate_name_aliases(
+            ["Some text here."], [], [], config,
+            file="test.docx", locations=["page:1"]
+        )
+        assert alias_ents == []
+
+
+
 
 
 
