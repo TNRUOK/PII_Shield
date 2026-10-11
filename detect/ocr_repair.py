@@ -33,9 +33,11 @@ log = logging.getLogger(__name__)
 # Look-alike guard patterns (same as in suspect.py — avoid circular import)
 # ---------------------------------------------------------------------------
 
-_DATE_RE = re.compile(r"^\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}$")
+_DATE_RE = re.compile(r"^(?:\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}|\d{4}[/\-]\d{1,2}[/\-]\d{1,2})$")
 _VERSION_SECTION_RE = re.compile(r"^(?:v(?:er(?:sion)?)?\.?\s*)?\d+\.\d+(?:\.\d+)*$", re.IGNORECASE)
+_SECTION_NUM_RE = re.compile(r"^\d+(?:\.\d+)+$")
 _CONTROL_RULE_ID_RE = re.compile(r"^(?:QRC_Sec|WR\.RP|PRD|REF|CASE|DOC)[A-Za-z0-9._\-]*$", re.IGNORECASE)
+_SHORT_INT_RE = re.compile(r"^\d{1,6}$")
 
 
 def _is_lookalike(token: str) -> bool:
@@ -44,7 +46,11 @@ def _is_lookalike(token: str) -> bool:
         return True
     if _VERSION_SECTION_RE.match(t):
         return True
+    if _SECTION_NUM_RE.match(t):
+        return True
     if _CONTROL_RULE_ID_RE.match(t):
+        return True
+    if _SHORT_INT_RE.match(t):
         return True
     return False
 
@@ -75,6 +81,9 @@ _DIGIT_NOISE_RE = re.compile(r"[/? ]")
 # Token patterns for potential numeric PII
 _NUMERIC_CANDIDATE_RE = re.compile(
     r"\b[0-9OoIlSBZG$|]{6,}\b"  # 6+ chars that could be a digit run after repair
+)
+_SSN_CANDIDATE_RE = re.compile(
+    r"\b[0-9OoIlSBZG$|]{3}-[0-9OoIlSBZG$|]{2}-[0-9OoIlSBZG$|]{4}\b"
 )
 
 # Email pattern (to detect and fix TLD typos)
@@ -165,7 +174,7 @@ def find_ocr_repair_hits(chunk, config: dict) -> List[RawHit]:
         entity_type = None
         confidence = 0.0
 
-        if n_digits == _SSN_DIGITS and ssn_sanity(repaired):
+        if n_digits == _SSN_DIGITS and (ssn_sanity(repaired) or ssn_sanity(f"{repaired[:3]}-{repaired[3:5]}-{repaired[5:]}")):
             entity_type = "SSN"
             confidence = 0.72   # lower because it's repaired OCR
         elif n_digits in (13, 14, 15, 16, 17, 18, 19) and luhn_check(repaired):
@@ -193,6 +202,29 @@ def find_ocr_repair_hits(chunk, config: dict) -> List[RawHit]:
                 method="ocr_repair",
             ))
             candidate_count += 1
+
+    # --- SSN hyphenated candidate repair ---
+    for m in _SSN_CANDIDATE_RE.finditer(text):
+        raw_token = m.group(0)
+        if _is_lookalike(raw_token):
+            continue
+        repaired = _repair_digit_token(raw_token)
+        if repaired == raw_token:
+            continue
+        if ssn_sanity(repaired):
+            log.debug(
+                "OCR repair: detected as SSN (span [%d:%d])",
+                m.start(), m.end()
+            )
+            hits.append(RawHit(
+                entity_type="SSN",
+                start=m.start(),
+                end=m.end(),
+                text=raw_token,
+                confidence=0.72,
+                sensitivity="High",
+                method="ocr_repair",
+            ))
 
     # --- Email TLD repair ---
     for m in _EMAIL_CANDIDATE_RE.finditer(text):

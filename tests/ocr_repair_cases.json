@@ -1,0 +1,115 @@
+{
+  "_comment": "Synthetic OCR repair test cases — all names, IDs, and numbers are invented.",
+  "positive": [
+    {
+      "id": "phone_dollar_S",
+      "text": "S84695931O",
+      "expected_entity": "PHONE",
+      "note": "S->5 and O->0 OCR confusion -> 5846959310 (10 digits, PHONE)"
+    },
+    {
+      "id": "phone_O_zero",
+      "text": "O8O5551234",
+      "expected_entity": "PHONE",
+      "note": "O confused for 0 -> 0805551234 (10 digits, PHONE)"
+    },
+    {
+      "id": "ssn_S_five_v2",
+      "text": "S23456789",
+      "expected_entity": "SSN",
+      "note": "S->5 OCR confusion -> 523456789 (9 digits, passes SSN sanity)"
+    },
+    {
+      "id": "email_tld_cam",
+      "text": "researcher@syntheticlabs.cam",
+      "expected_entity": "EMAIL",
+      "note": ".cam OCR confusion for .com"
+    },
+    {
+      "id": "email_tld_corn",
+      "text": "j.smith@fakefirm.corn",
+      "expected_entity": "EMAIL",
+      "note": ".corn OCR confusion for .com"
+    },
+    {
+      "id": "email_rn_m",
+      "text": "hr@syntheticfirn.com",
+      "expected_entity": "EMAIL",
+      "note": "rn→m at domain end: syntheticfirn → syntheticfirm"
+    },
+    {
+      "id": "ssn_S_five",
+      "text": "S23-45-6789",
+      "expected_entity": "SSN",
+      "note": "S confused for 5 → 523-45-6789 (passes SSN sanity)"
+    },
+    {
+      "id": "phone_l_one",
+      "text": "lOOO5551234",
+      "expected_entity": "PHONE",
+      "note": "l->1 and O->0 -> 10005551234 (11 digits, PHONE)"
+    }
+  ],
+  "negative": [
+    {
+      "id": "date_slash",
+      "text": "12/05/2026",
+      "expected_entity": null,
+      "note": "Date — must never produce a hit"
+    },
+    {
+      "id": "version_number",
+      "text": "4.31.2",
+      "expected_entity": null,
+      "note": "Version — must never produce a hit"
+    },
+    {
+      "id": "rule_id_qrc",
+      "text": "QRC_Sec_4.31",
+      "expected_entity": null,
+      "note": "Control rule ID — must never produce a hit"
+    },
+    {
+      "id": "rule_id_wr",
+      "text": "WR.RP.1",
+      "expected_entity": null,
+      "note": "Control rule ID — must never produce a hit"
+    },
+    {
+      "id": "section_number",
+      "text": "4.2.3",
+      "expected_entity": null,
+      "note": "Section number — must never produce a hit"
+    },
+    {
+      "id": "ref_number_long",
+      "text": "REF-9876543210123",
+      "expected_entity": null,
+      "note": "Reference number — must never produce a hit"
+    },
+    {
+      "id": "prd_number",
+      "text": "PRD-20240115",
+      "expected_entity": null,
+      "note": "Product/release ID — must never produce a hit"
+    },
+    {
+      "id": "day_count_three_digit",
+      "text": "275",
+      "expected_entity": null,
+      "note": "3-digit day count — too short, must not be flagged"
+    },
+    {
+      "id": "day_count_six_digit",
+      "text": "640000",
+      "expected_entity": null,
+      "note": "6-digit bare integer — too ambiguous, must not be flagged"
+    },
+    {
+      "id": "ip_already_repaired",
+      "text": "19.46.59.64",
+      "expected_entity": null,
+      "note": "IP already all digits — repair adds nothing, normal rules handle it"
+    }
+  ]
+}
