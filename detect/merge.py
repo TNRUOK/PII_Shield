@@ -178,6 +178,7 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
     from detect.ner import run_ner
     from detect.context import run_context
     from detect.suspect import find_suspect_ocr_hits
+    from detect.ocr_repair import find_ocr_repair_hits
 
     if chunk.is_blocked() or not chunk.text.strip():
         return []
@@ -211,6 +212,13 @@ def detect_chunk(chunk, config: dict) -> List[Entity]:
         log.debug("SUSPECT_OCR: %d hits from low-confidence OCR lines in %s",
                   len(suspect_hits), chunk.location)
         all_hits.extend(suspect_hits)
+
+    # Item 2: character-confusion normalisation for OCR candidate tokens
+    repair_hits = find_ocr_repair_hits(chunk, config)
+    if repair_hits:
+        log.debug("OCR_REPAIR: %d normalised hits in %s",
+                  len(repair_hits), chunk.location)
+        all_hits.extend(repair_hits)
 
     # Re-derive raw_value from chunk text for span-merged hits
     entities = merge_hits(all_hits, chunk.file, chunk.location, config)

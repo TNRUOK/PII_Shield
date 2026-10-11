@@ -719,5 +719,65 @@ class TestSuspectOCR:
             f"Expected SUSPECT_OCR or EMAIL for OCR email, got {types}")
 
 
+# ---------------------------------------------------------------------------
+# Item 2: OCR character-confusion candidate normalisation
+# ---------------------------------------------------------------------------
+
+class TestOCRRepair:
+    """Tests for detect/ocr_repair.py — character confusion normalisation."""
+
+    def test_email_tld_cam_repaired(self, config):
+        """Email with .cam TLD (OCR confusion) should be detected as EMAIL."""
+        from detect.ocr_repair import find_ocr_repair_hits
+        text = "Send results to researcher@syntheticlabs.cam"
+        chunk = _ocr_chunk(text, [(text, 65.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        email_hits = [h for h in hits if h.entity_type == "EMAIL"]
+        assert len(email_hits) >= 1, f"Expected repaired EMAIL hit, got {hits}"
+
+    def test_email_tld_corn_repaired(self, config):
+        """Email with .corn TLD (OCR confusion for .com) should be repaired."""
+        from detect.ocr_repair import find_ocr_repair_hits
+        text = "Contact: j.smith@fakefirm.corn"
+        chunk = _ocr_chunk(text, [(text, 60.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        email_hits = [h for h in hits if h.entity_type == "EMAIL"]
+        assert len(email_hits) >= 1, f"Expected repaired EMAIL hit, got {hits}"
+
+    def test_native_chunk_not_repaired(self, config):
+        """OCR repair should NOT run on native text chunks."""
+        from detect.ocr_repair import find_ocr_repair_hits
+        text = "researcher@syntheticlabs.cam"
+        chunk = _native_chunk_bare(text)
+        hits = find_ocr_repair_hits(chunk, config)
+        assert hits == [], "OCR repair must not run on native chunks"
+
+    def test_date_lookalike_skipped(self, config):
+        """A date-shaped token must NOT be repaired into a false-positive."""
+        from detect.ocr_repair import find_ocr_repair_hits
+        text = "Effective 12/05/2026"
+        chunk = _ocr_chunk(text, [(text, 55.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        assert hits == [], f"Date look-alike must not be repaired: {hits}"
+
+    def test_version_skipped(self, config):
+        """Version string must not be repaired."""
+        from detect.ocr_repair import find_ocr_repair_hits
+        text = "Version 4.31.2"
+        chunk = _ocr_chunk(text, [(text, 70.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        assert hits == [], f"Version string must not be repaired: {hits}"
+
+    def test_unchanged_token_not_emitted(self, config):
+        """If no characters are substituted, no hit is emitted."""
+        from detect.ocr_repair import find_ocr_repair_hits
+        text = "Account 123456789"   # already all digits — no repair needed
+        chunk = _ocr_chunk(text, [(text, 72.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        repair_hits = [h for h in hits if h.method == "ocr_repair"]
+        assert len(repair_hits) == 0, "No-change token should not emit ocr_repair hit"
+
+
+
 
 
