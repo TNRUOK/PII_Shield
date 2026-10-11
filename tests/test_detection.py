@@ -855,3 +855,245 @@ class TestNameAliasPropagation:
 
 
 
+
+    def test_stoplisted_source_not_propagated(self, config):
+        """Source names containing a stoplisted word must NOT propagate any aliases."""
+        from detect.propagate import propagate_name_aliases
+        from detect.merge import Entity
+        person_ent = Entity(
+            entity_type="PERSON", sensitivity="Medium", confidence=0.75,
+            methods=["ner"], file="test.docx", location="page:1",
+            start=0, end=10, raw_value="Menon Road",
+            masked_value="M*******d", placeholder="[PERSON_1]"
+        )
+        texts = ["Menon Road is the registered address.", "Road was mentioned again."]
+        locs = ["page:1", "page:2"]
+        alias_ents = propagate_name_aliases(
+            texts, [person_ent], [person_ent], config,
+            file="test.docx", locations=locs
+        )
+        assert alias_ents == [], f"Stoplisted source must not propagate: {alias_ents}"
+
+    def test_alias_propagation_flag_off(self, config):
+        """When alias_propagation=false in config, propagation returns empty."""
+        from detect.propagate import propagate_name_aliases
+        from detect.merge import Entity
+        cfg = {**config, "alias_propagation": False}
+        person_ent = Entity(
+            entity_type="PERSON", sensitivity="Medium", confidence=0.85,
+            methods=["ner"], file="test.docx", location="page:1",
+            start=0, end=14, raw_value="Jonathan Marsh",
+            masked_value="J***********h", placeholder="[PERSON_1]"
+        )
+        texts = ["Jonathan Marsh signed the agreement.", "Marsh confirmed receipt."]
+        locs = ["page:1", "page:2"]
+        alias_ents = propagate_name_aliases(
+            texts, [person_ent], [person_ent], cfg,
+            file="test.docx", locations=locs
+        )
+        assert alias_ents == [], "alias_propagation=false must suppress all propagation"
+
+
+# ---------------------------------------------------------------------------
+# Item 1 (v5): Typed hit always wins over SUSPECT_OCR
+# ---------------------------------------------------------------------------
+
+class TestSuspectOCRTypedHitPriority:
+    """SUSPECT_OCR must not override typed entities (PHONE, EMAIL, SSN)."""
+
+    def test_typed_phone_preserved_over_suspect(self, config):
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+        text = "Contact: +91 9876543210"
+        chunk = Chunk(
+            file="scanned_policy.pdf", location="page:2", text=text,
+            method="ocr", ocr_confidence=45.0, order_index=1,
+            line_confidences=[(text, 45.0)],
+        )
+        entities = detect_chunk(chunk, config)
+        types = {e.entity_type for e in entities}
+        assert "PHONE" in types, (
+            "PHONE must survive on low-conf OCR line; got " + str(types))
+
+    def test_suspect_gap_fills_unknown_token(self, config):
+        from detect.suspect import find_suspect_ocr_hits
+        text = "Token: 87654321"
+        chunk = _ocr_chunk(text, [(text, 40.0)])
+        hits = find_suspect_ocr_hits(chunk, config, existing_hits=[])
+        types = {h.entity_type for h in hits}
+        assert "SUSPECT_OCR" in types, (
+            "Unrecognised 8-digit token must get SUSPECT_OCR; got " + str(types))
+
+    def test_suspect_skips_when_phone_hit_exists(self, config):
+        from detect.suspect import find_suspect_ocr_hits
+        from detect.rules import RawHit
+        text = "+91 9876543210"
+        phone_hit = RawHit(
+            entity_type="PHONE", start=0, end=len(text), text=text,
+            confidence=0.75, sensitivity="Medium", method="rule",
+        )
+        chunk = _ocr_chunk(text, [(text, 42.0)])
+        hits = find_suspect_ocr_hits(chunk, config, existing_hits=[phone_hit])
+        suspect = [h for h in hits if h.entity_type == "SUSPECT_OCR"]
+        assert len(suspect) == 0, (
+            "SUSPECT_OCR must not overlap a PHONE hit; got " + str(suspect))
+
+
+# ---------------------------------------------------------------------------
+# Item 3: Parameterized OCR repair test cases (from ocr_repair_cases.json)
+# ---------------------------------------------------------------------------
+
+import json
+import os as _os
+
+_REPAIR_CASES_PATH = _os.path.join(
+    _os.path.dirname(__file__), "ocr_repair_cases.json"
+)
+
+
+def _load_repair_cases():
+    with open(_REPAIR_CASES_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    positives = [
+        (c["id"], c["text"], c["expected_entity"]) for c in data["positive"]
+    ]
+    negatives = [(c["id"], c["text"]) for c in data["negative"]]
+    return positives, negatives
+
+
+_POS_CASES, _NEG_CASES = _load_repair_cases()
+
+
+class TestOCRRepairParameterized:
+    """Parameterized tests driven by tests/ocr_repair_cases.json."""
+
+    @pytest.mark.parametrize("case_id,text,expected_type", _POS_CASES)
+    def test_positive_case_detected(self, config, case_id, text, expected_type):
+        from detect.ocr_repair import find_ocr_repair_hits
+        chunk = _ocr_chunk(text, [(text, 55.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        types = {h.entity_type for h in hits}
+        assert expected_type in types, (
+            "[" + case_id + "] Expected " + expected_type + " for " + repr(text) +
+            "; got " + str(types))
+
+    @pytest.mark.parametrize("case_id,text", _NEG_CASES)
+    def test_negative_case_not_flagged(self, config, case_id, text):
+        from detect.ocr_repair import find_ocr_repair_hits
+        chunk = _ocr_chunk(text, [(text, 55.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        assert hits == [], (
+            "[" + case_id + "] Look-alike " + repr(text) + " must not be flagged; got " + str(hits))
+
+    @pytest.mark.parametrize("case_id,text,expected_type", _POS_CASES)
+    def test_repair_on_vs_off(self, config, case_id, text, expected_type):
+        from detect.merge import detect_chunk
+        chunk_on = _ocr_chunk(text, [(text, 55.0)])
+        chunk_off = _ocr_chunk(text, [(text, 55.0)])
+        ents_on = detect_chunk(chunk_on, config, use_repair=True)
+        ents_off = detect_chunk(chunk_off, config, use_repair=False)
+        assert len(ents_on) >= len(ents_off), (
+            "[" + case_id + "] Repair ON (" + str(len(ents_on)) +
+            ") should find >= repair OFF (" + str(len(ents_off)) + ")")
+
+    @pytest.mark.parametrize("case_id,text,expected_type", _POS_CASES)
+    def test_original_span_redacted_not_repaired_string(self, config, case_id, text, expected_type):
+        from detect.ocr_repair import find_ocr_repair_hits
+        chunk = _ocr_chunk(text, [(text, 55.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        for h in hits:
+            if h.entity_type == expected_type:
+                assert h.text in text, (
+                    "[" + case_id + "] Hit text " + repr(h.text) +
+                    " must be a substring of original " + repr(text))
+
+
+# ---------------------------------------------------------------------------
+# Item 4: Shared precision guard fixture across all detection layers
+# ---------------------------------------------------------------------------
+
+_PRECISION_GUARD_CASES = [
+    ("date_slash",         "12/05/2026"),
+    ("date_iso",           "2024-10-09"),
+    ("version_three",      "4.31.2"),
+    ("rule_qrc",           "QRC_Sec_4.31"),
+    ("rule_wr",            "WR.RP.1"),
+    ("rule_cl",            "CL.13"),
+    ("section_number",     "4.2.3"),
+    ("day_count_275",      "275"),
+    ("day_count_640",      "640"),
+    ("ref_long",           "REF-9876543210123"),
+    ("prd_date",           "PRD-20240115"),
+    ("group_security",     "Security Group"),
+    ("group_data_quality", "Data Quality Group"),
+    ("group_user_groups",  "USER GROUPS"),
+    ("acronym_byod",       "BYOD"),
+    ("acronym_mfa",        "MFA"),
+    ("product_onetrust",   "OneTrust"),
+    ("product_ironclad",   "Ironclad"),
+    ("stage_launching",    "Launching ServPro"),
+]
+
+
+class TestPrecisionGuardAllLayers:
+    """Item 4: Zero false positives for look-alike tokens across all detection layers."""
+
+    @pytest.mark.parametrize("case_id,text", _PRECISION_GUARD_CASES)
+    def test_rules_layer_no_fp(self, config, case_id, text):
+        hits = run_rules(text, config)
+        pii = [h for h in hits if h.entity_type != "SUSPECT_OCR"]
+        assert len(pii) == 0, (
+            "[" + case_id + "] Rules FP: " + str([(h.entity_type, h.text) for h in pii]))
+
+    @pytest.mark.parametrize("case_id,text", _PRECISION_GUARD_CASES)
+    def test_full_pipeline_no_fp(self, config, case_id, text):
+        from extract.models import Chunk
+        from detect.merge import detect_chunk
+        chunk = Chunk(
+            file="test.docx", location="body", text=text,
+            method="native", ocr_confidence=None, order_index=0,
+        )
+        entities = detect_chunk(chunk, config)
+        fps = [e for e in entities if e.raw_value.strip() == text.strip()]
+        assert len(fps) == 0, (
+            "[" + case_id + "] Pipeline FP: " +
+            str([(e.entity_type, e.raw_value) for e in fps]))
+
+    @pytest.mark.parametrize("case_id,text", _PRECISION_GUARD_CASES)
+    def test_ocr_repair_no_fp(self, config, case_id, text):
+        from detect.ocr_repair import find_ocr_repair_hits
+        chunk = _ocr_chunk(text, [(text, 55.0)])
+        hits = find_ocr_repair_hits(chunk, config)
+        assert hits == [], (
+            "[" + case_id + "] OCR repair FP: " +
+            str([(h.entity_type, h.text) for h in hits]))
+
+    @pytest.mark.parametrize("case_id,text", _PRECISION_GUARD_CASES)
+    def test_suspect_layer_no_fp(self, config, case_id, text):
+        from detect.suspect import find_suspect_ocr_hits
+        chunk = _ocr_chunk(text, [(text, 40.0)])
+        hits = find_suspect_ocr_hits(chunk, config, existing_hits=[])
+        assert hits == [], (
+            "[" + case_id + "] Suspect FP: " +
+            str([(h.entity_type, h.text) for h in hits]))
+
+    @pytest.mark.parametrize("case_id,text", _PRECISION_GUARD_CASES)
+    def test_alias_propagation_no_fp(self, config, case_id, text):
+        from detect.propagate import propagate_name_aliases
+        from detect.merge import Entity
+        person_ent = Entity(
+            entity_type="PERSON", sensitivity="Medium", confidence=0.85,
+            methods=["ner"], file="guard.docx", location="page:1",
+            start=0, end=13, raw_value="Samantha Rowe",
+            masked_value="S**********e", placeholder="[PERSON_1]"
+        )
+        texts = ["Samantha Rowe approved the document.", text]
+        locs = ["page:1", "page:2"]
+        alias_ents = propagate_name_aliases(
+            texts, [person_ent], [person_ent], config,
+            file="guard.docx", locations=locs
+        )
+        fps = [e for e in alias_ents if text.strip() in e.raw_value]
+        assert len(fps) == 0, (
+            "[" + case_id + "] Alias FP: " +
+            str([(e.entity_type, e.raw_value) for e in fps]))
