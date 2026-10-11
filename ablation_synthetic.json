@@ -1,0 +1,68 @@
+[
+  {
+    "stage": "1. rules only",
+    "precision": 0.9111,
+    "recall": 0.4316,
+    "f1": 0.5857,
+    "suspect_ocr_count": 0,
+    "alias_redactions_count": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0
+  },
+  {
+    "stage": "2. rules + NER",
+    "precision": 0.9271,
+    "recall": 0.9368,
+    "f1": 0.9319,
+    "suspect_ocr_count": 0,
+    "alias_redactions_count": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0
+  },
+  {
+    "stage": "3. + context rules",
+    "precision": 0.9271,
+    "recall": 0.9368,
+    "f1": 0.9319,
+    "suspect_ocr_count": 0,
+    "alias_redactions_count": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0
+  },
+  {
+    "stage": "4. + OCR repair (Item 2)",
+    "precision": 0.9271,
+    "recall": 0.9368,
+    "f1": 0.9319,
+    "suspect_ocr_count": 0,
+    "alias_redactions_count": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0
+  },
+  {
+    "stage": "5. + suspect-line (Item 1)",
+    "precision": 0.9175,
+    "recall": 0.9368,
+    "f1": 0.9271,
+    "suspect_ocr_count": 1,
+    "alias_redactions_count": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0
+  },
+  {
+    "stage": "6. + alias propagation (Item 3)",
+    "precision": 0.899,
+    "recall": 0.9368,
+    "f1": 0.9175,
+    "suspect_ocr_count": 1,
+    "alias_redactions_count": 2,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0
+  }
+]

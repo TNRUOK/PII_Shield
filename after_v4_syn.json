@@ -1,0 +1,117 @@
+{
+  "entity_metrics": {
+    "AADHAAR": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "EMAIL": {
+      "tp": 18,
+      "fp": 1,
+      "fn": 2,
+      "precision": 0.9474,
+      "recall": 0.9,
+      "f1": 0.9231
+    },
+    "EMPLOYEE_ID": {
+      "tp": 6,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.8571,
+      "recall": 0.8571,
+      "f1": 0.8571
+    },
+    "GOVERNMENT_ID": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "IP_ADDRESS": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PAN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PERSON": {
+      "tp": 48,
+      "fp": 6,
+      "fn": 1,
+      "precision": 0.8889,
+      "recall": 0.9796,
+      "f1": 0.932
+    },
+    "PHONE": {
+      "tp": 13,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.9286,
+      "f1": 0.963
+    },
+    "SSN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6667
+    },
+    "SUSPECT_OCR": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "OVERALL": {
+      "tp": 89,
+      "fp": 10,
+      "fn": 6,
+      "precision": 0.899,
+      "recall": 0.9368,
+      "f1": 0.9175
+    }
+  },
+  "structure_retention": {
+    "org_pack.pptx": 0.8978,
+    "scanned_policy.pdf": 0.9608,
+    "training_guide.docx": 0.9887
+  },
+  "throughput": [
+    {
+      "file": "org_pack.pptx",
+      "seconds": 5.707398900296539,
+      "pages": 8,
+      "ppm": 84.10135832192502
+    },
+    {
+      "file": "scanned_policy.pdf",
+      "seconds": 3.036329499911517,
+      "pages": 6,
+      "ppm": 118.56420721482662
+    },
+    {
+      "file": "training_guide.docx",
+      "seconds": 3.8358482997864485,
+      "pages": 4,
+      "ppm": 62.56764638303382
+    }
+  ]
+}
