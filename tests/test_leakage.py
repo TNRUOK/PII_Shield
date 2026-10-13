@@ -347,4 +347,176 @@ def test_zero_raw_pii_in_pipeline_logs_and_reports(config, tmp_path, caplog):
     assert not mapping.mapping_path.exists()
 
 
+# ---------------------------------------------------------------------------
+# Phase 6 Leak Checker Enhancements: Residual PII & Visual Chunks
+# ---------------------------------------------------------------------------
+
+def test_residual_9xx_ssn_detected(config):
+    """Residual 9xx SSN must be flagged as a leak."""
+    chunk = Chunk(
+        file="leak_9xx.txt",
+        location="page:1",
+        text="Applicant test record with SSN 987-65-4321 was noted.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert any(e.entity_type == "SSN" for e in result.leaks)
+
+
+def test_residual_intl_phone_detected(config):
+    """Residual international phone numbers must be flagged as a leak."""
+    chunk = Chunk(
+        file="leak_intl_phone.txt",
+        location="page:1",
+        text="For urgent escalation call +44 20 7946 0958 immediately.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert any(e.entity_type == "PHONE" for e in result.leaks)
+
+
+def test_residual_dob_detected(config):
+    """Residual date of birth pattern must be flagged as a leak."""
+    chunk = Chunk(
+        file="leak_dob.txt",
+        location="page:1",
+        text="Participant details: DOB: 12/05/1990 in record.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert any(e.entity_type == "DATE_OF_BIRTH" for e in result.leaks)
+
+
+def test_residual_narrative_address_detected(config):
+    """Residual narrative address must be flagged as a leak."""
+    chunk = Chunk(
+        file="leak_addr.txt",
+        location="page:1",
+        text="The client currently resides at 456 Elm Street for billing.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert any(e.entity_type == "ADDRESS" for e in result.leaks)
+
+
+def test_residual_ending_digits_detected(config):
+    """Residual ending-#### account digits pattern must be flagged as a leak."""
+    chunk = Chunk(
+        file="leak_acct.txt",
+        location="page:1",
+        text="Payment confirmed for card ending in 9876.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert any(e.entity_type == "ACCOUNT_NUMBER" for e in result.leaks)
+
+
+def test_residual_anchored_initials_name_detected(config):
+    """Residual anchored initials name must be flagged as a leak."""
+    chunk = Chunk(
+        file="leak_name.txt",
+        location="page:1",
+        text="Reviewed and signed by Director M. Achebe on Friday.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    assert result.downstream_safe is False
+    assert any(e.entity_type == "PERSON" for e in result.leaks)
+
+
+def test_visual_chunks_scanned_and_leaks_detected(config):
+    """Region OCR and SVG text chunks are counted in visual_chunks_scanned and scanned for leaks."""
+    chunks = [
+        Chunk(
+            file="report.pdf",
+            location="page:1_region_0",
+            text="Admin console screenshot: email admin@corp.internal and phone +49 30 123456.",
+            method="region_ocr",
+            ocr_confidence=88.0,
+            order_index=0,
+            region_type="graphic",
+            image_status="READ",
+        ),
+        Chunk(
+            file="diagram.docx",
+            location="word/media/chart.svg",
+            text="Vector diagram label: [PERSON_1] reported to supervisor.",
+            method="svg_text",
+            ocr_confidence=None,
+            order_index=1,
+            image_status="READ",
+        ),
+    ]
+    result = check_leakage(chunks, config)
+    assert result.visual_chunks_scanned == 2
+    assert result.downstream_safe is False
+    leak_types = {e.entity_type for e in result.leaks}
+    assert "EMAIL" in leak_types or "PHONE" in leak_types
+    assert "visual chunks: 2" in result.summary()
+
+
+def test_clean_visual_chunks_are_safe(config):
+    """Clean region OCR and SVG text chunks produce downstream_safe=True."""
+    chunks = [
+        Chunk(
+            file="report.pdf",
+            location="page:1_region_0",
+            text="Table header: Revenue and Quarterly Growth metrics [METRIC_1].",
+            method="region_ocr",
+            ocr_confidence=92.0,
+            order_index=0,
+            region_type="table",
+            image_status="READ",
+        ),
+        Chunk(
+            file="diagram.docx",
+            location="word/media/chart.svg",
+            text="Architecture component: Data Flow and Cache Service.",
+            method="svg_text",
+            ocr_confidence=None,
+            order_index=1,
+            image_status="READ",
+        ),
+    ]
+    result = check_leakage(chunks, config)
+    assert result.visual_chunks_scanned == 2
+    assert result.downstream_safe is True
+    assert len(result.leaks) == 0
+    assert "visual chunks: 2" in result.summary()
+
+
+def test_unanchored_initials_captured_in_residue_without_leak(config):
+    """Unanchored initials name that bypasses primary NER goes to unverified residue without failing downstream_safe if clean."""
+    chunk = Chunk(
+        file="doc.txt",
+        location="page:1",
+        text="The system batch was processed with PQ Lindqvist in sector 4.",
+        method="native",
+        ocr_confidence=None,
+        order_index=0,
+    )
+    result = check_leakage([chunk], config)
+    # Check that initials residue is captured
+    assert any("INITIALS" in r.get("type", "") for r in result.unverified_residue)
+    assert result.downstream_safe is True
+
+
+
 
