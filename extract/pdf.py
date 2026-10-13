@@ -20,7 +20,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 from PIL import Image
 
 from extract.models import Chunk
@@ -61,7 +61,7 @@ def _ocr_page_worker(args: tuple) -> tuple:
     file_path, page_num, ocr_min_conf, config, dpi = args
     os.environ["OMP_THREAD_LIMIT"] = "1"
     try:
-        import fitz
+        import pymupdf as fitz
         from PIL import Image
         import hashlib
         from extract.ocr import ocr_image

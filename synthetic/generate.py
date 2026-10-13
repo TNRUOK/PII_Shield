@@ -39,7 +39,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 from faker import Faker
 from PIL import Image, ImageDraw, ImageFont
 from docx import Document

@@ -40,7 +40,7 @@ def _get_doc_page_count(doc_path: Path) -> int:
     ext = doc_path.suffix.lower()
     try:
         if ext == ".pdf":
-            import fitz
+            import pymupdf as fitz
             doc = fitz.open(doc_path)
             return len(doc)
         elif ext == ".pptx":

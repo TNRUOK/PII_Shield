@@ -25,7 +25,7 @@ import zipfile
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from docx import Document
