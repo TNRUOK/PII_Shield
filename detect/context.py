@@ -291,4 +291,64 @@ def run_context(
                 method="context",
             ))
 
+    # --- Strategy 4: Anchor Rule (Issue 6a) ---
+    # 2 to 4 capitalized tokens immediately before an ID/email/phone, or after a role title
+    denylist = {w.lower() for w in config.get("person_denylist", [])}
+    stoplist = {w.lower() for w in config.get("alias_source_stoplist", [])}
+    non_person = {w.lower() for w in config.get("non_person_terms", [
+        "Committee", "Office", "Group", "Board", "Risk", "Privacy",
+        "Security", "Compliance", "Audit", "Technology", "Operations"
+    ])}
+    veto_words = denylist | stoplist | non_person | _NAME_STOP_WORDS
+
+    anchor_tail_pattern = re.compile(
+        r"(?:\s*[\(\[]?\s*(?:EMP[\-_]\d{3,8}|DIR-\d{4})\)?|"
+        r"\s*\|\s*<?[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,10}>?|"
+        r"\s+<?[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,10}>?|"
+        r"\s*\|\s*\+?[1-9]\d{0,3}[\s.\-]?\(?\d{1,5}\)?[\s.\-]?\d{3,5}|"
+        r"\s+\+?[1-9]\d{0,3}[\s.\-]?\(?\d{1,5}\)?[\s.\-]?\d{3,5})"
+    )
+
+    role_prefix_pattern = re.compile(
+        r"(?i:\b(?:Role|Title|Designation|Position|Director|Officer|Lead|Analyst|Engineer|Architect|Manager|Signatory|Custodian|Owner|Primary\s+Signatory|Chief\s+Architect)\s*[:\-]\s*)"
+    )
+
+    name_cand_pattern = re.compile(
+        r"\b((?:[A-Z]{1,3}\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[^\S\r\n]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){1,3})\b"
+    )
+
+    for m in name_cand_pattern.finditer(chunk_text):
+        cand_name = m.group(1).strip()
+        words = cand_name.split()
+        if len(words) < 2:
+            continue
+        if any(w.strip(":-.,;'\"").lower() in veto_words for w in words):
+            continue
+
+        s, e = m.start(1), m.end(1)
+        tail_text = chunk_text[e:e + 60]
+        head_text = chunk_text[max(0, s - 40):s]
+
+        is_anchor_match = False
+        if anchor_tail_pattern.match(tail_text):
+            is_anchor_match = True
+        elif role_prefix_pattern.search(head_text):
+            is_anchor_match = True
+
+        if is_anchor_match:
+            covered = any(
+                h.entity_type == "PERSON" and h.start <= s and h.end >= e
+                for h in (updated + new_hits)
+            )
+            if not covered:
+                new_hits.append(RawHit(
+                    entity_type="PERSON",
+                    start=s,
+                    end=e,
+                    text=cand_name,
+                    confidence=0.90,
+                    sensitivity="Medium",
+                    method="anchor",
+                ))
+
     return new_hits, updated
