@@ -149,8 +149,8 @@ function getElementText(el) {
   return el.innerText || el.textContent || "";
 }
 
-function setElementText(el, text) {
-  if (!el) return;
+async function setElementText(el, text) {
+  if (!el) return false;
   el.focus();
 
   if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
@@ -167,9 +167,18 @@ function setElementText(el, text) {
     }
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
   } else {
-    // Contenteditable: select all existing content first, then replace atomically.
-    // This prevents partial replacement bugs in ProseMirror / Lexical editors.
+    // Contenteditable (ProseMirror / Lexical / CodeMirror):
+    // execCommand is deprecated and silently fails in modern Chrome.
+    // Most reliable approach: write to clipboard + dispatch synthetic Ctrl+A + paste.
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      // Clipboard write blocked — fall through to direct innerText
+    }
+
+    // Select-all then insert via execCommand (works in many editors)
     const selection = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -179,21 +188,29 @@ function setElementText(el, text) {
     let executed = false;
     try {
       executed = document.execCommand("insertText", false, text);
-    } catch (e) {
+    } catch (_) {
       executed = false;
     }
 
     if (!executed) {
-      // execCommand is deprecated — fall back to direct assignment + synthetic event
-      el.innerText = text;
-      el.dispatchEvent(
-        new InputEvent("input", {
-          bubbles: true,
-          inputType: "insertText",
-          data: text,
-        })
-      );
+      // Fallback: dispatch a paste event with the text in clipboardData.
+      // This is the only method that reliably triggers Lexical/ProseMirror state updates.
+      try {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+        executed = true;
+      } catch (_) {
+        executed = false;
+      }
     }
+
+    if (!executed) {
+      // Last resort: direct DOM write + InputEvent
+      el.innerText = text;
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    }
+    return executed;
   }
 }
 
@@ -229,7 +246,7 @@ async function shieldCurrentInput() {
     activeSessionId = data.session_id;
     chrome.storage.local.set({ sessionId: activeSessionId });
 
-    setElementText(inputEl, data.redacted_text);
+    await setElementText(inputEl, data.redacted_text);
 
     const count = data.detected_pii ? data.detected_pii.length : 0;
     if (count > 0) {
@@ -257,7 +274,7 @@ async function handleLocalDocumentSanitize(file) {
     docBtn.disabled = true;
   }
 
-  showToast(`🛡️ Intercepted "${file.name}"! Sanitizing locally before cloud LLM...`, true);
+  showToast(`🛡️ Intercepted "${file.name}"! Sanitizing locally...`, true);
 
   try {
     const base64Data = await fileToBase64(file);
@@ -272,16 +289,27 @@ async function handleLocalDocumentSanitize(file) {
     activeSessionId = data.session_id;
     chrome.storage.local.set({ sessionId: activeSessionId });
 
-    const inputEl = findPromptInput();
     const formattedPrompt = `[Document: ${file.name}]\n\n${data.redacted_text}`;
+    const count = data.detected_pii ? data.detected_pii.length : 0;
 
+    // Always copy to clipboard first — guaranteed delivery
+    try { await navigator.clipboard.writeText(formattedPrompt); } catch (_) {}
+
+    // Then attempt to inject into the prompt box
+    const inputEl = findPromptInput();
+    let injected = false;
     if (inputEl) {
-      setElementText(inputEl, formattedPrompt);
-      const count = data.detected_pii ? data.detected_pii.length : 0;
-      showToast(`✅ "${file.name}" shielded! ${count} PII masked & pasted safely.`, true);
+      injected = await setElementText(inputEl, formattedPrompt);
+    }
+
+    if (injected) {
+      showToast(`✅ "${file.name}" shielded! ${count} PII masked — text inserted into prompt.`, true);
     } else {
-      navigator.clipboard.writeText(formattedPrompt);
-      showToast(`✅ "${file.name}" sanitized! Copied to clipboard.`, true);
+      // Injection failed or no input found: clipboard is ready
+      showToast(
+        `✅ "${file.name}" shielded! ${count} PII masked — copied to clipboard. Press Ctrl+V to paste.`,
+        true
+      );
     }
   } catch (err) {
     showToast("❌ Could not sanitize file: " + err.message, false);
