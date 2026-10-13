@@ -1,0 +1,5 @@
+# PII Shield — Optional Dependencies (Only required when optional switches are enabled)
+# Optional second OCR engines (Issue 9e)
+paddlepaddle==2.6.2
+paddleocr==2.9.1
+# python-doctr==0.10.0

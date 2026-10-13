@@ -31,6 +31,10 @@ enabled_entities:
   - IP_ADDRESS
   - PERSON
   - SUSPECT_OCR
+  - ADDRESS
+  - DIRECTOR_ID
+  - VENDOR_ID
+  - PESEL
   # - LOCATION   # off by default — high false-positive rate on city/company names
 
 # Denylist for PERSON entities in NER (reject corporate/product/generic terms)
@@ -117,9 +121,36 @@ alias_source_stoplist:
   - Quality
 
 sensitivity_map:
-  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR]
-  Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, DATE_OF_BIRTH, PERSON]
+  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR, ADDRESS, DATE_OF_BIRTH, PESEL]
+  Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, PERSON, DIRECTOR_ID, VENDOR_ID]
   Low:    [IP_ADDRESS, GOVERNMENT_ID]
+
+# Test and training SSN ranges (permits 900-999 area numbers in labeled/test context)
+ssn_accept_test_ranges: true
+
+# Corporate address allowlist: addresses on lines with these terms will not be redacted unless personal label present
+corporate_address_allowlist:
+  - Inc.
+  - Ltd
+  - LLC
+  - Financial Group
+  - Corp
+  - Corporation
+  - AcmeCorp
+
+# Terms that VETO person name matches when adjacent or anchor
+non_person_terms:
+  - Committee
+  - Office
+  - Group
+  - Board
+  - Risk
+  - Privacy
+  - Security
+  - Compliance
+  - Audit
+  - Technology
+  - Operations
 
 redaction:
   placeholder_format: "[{type}_{n}]"   # e.g. [PERSON_1], [EMAIL_2]
@@ -134,3 +165,10 @@ pdf_native_min_chars: 50
 # OCR engine settings (Tesseract)
 ocr_psm: 6        # Page Segmentation Mode: 6=uniform block, 3=auto (fallback)
 ocr_oem: 3        # OCR Engine Mode: 3=LSTM only (best accuracy)
+
+# Region OCR settings (Issue 9)
+ocr_region_min_px: [120, 60]
+ocr_region_conf: 70
+ocr_min_words_per_megapixel: 10
+ocr_second_engine: "none"   # none | paddleocr | doctr
+export_blanked_pages: false

@@ -120,27 +120,80 @@ def iban_check(iban: str) -> bool:
 # US SSN sanity check
 # ---------------------------------------------------------------------------
 
-def ssn_sanity(ssn: str) -> bool:
+def ssn_sanity(ssn: str, allow_test_ranges: bool = False) -> bool:
     """
-    Return True if `ssn` (format NNN-NN-NNNN) passes basic SSN rules:
-      - Area number (first 3 digits) ≠ 000, 666, or 900-999
+    Return True if `ssn` (format NNN-NN-NNNN or 9 digits) passes basic SSN rules:
+      - Area number (first 3 digits) ≠ 000, 666 (and < 900 unless allow_test_ranges=True)
       - Group number (middle 2 digits) ≠ 00
       - Serial number (last 4 digits) ≠ 0000
-
-    Does NOT validate against the SSA's actual assignment records.
     """
-    m = re.fullmatch(r"(\d{3})-(\d{2})-(\d{4})", ssn.strip())
+    s = ssn.strip()
+    m = re.fullmatch(r"(\d{3})-?(\d{2})-?(\d{4})", s)
     if not m:
         return False
     area, group, serial = m.group(1), m.group(2), m.group(3)
     area_n = int(area)
-    if area_n == 0 or area_n == 666 or area_n >= 900:
+    if area_n == 0 or area_n == 666:
+        return False
+    if not allow_test_ranges and area_n >= 900:
         return False
     if group == "00":
         return False
     if serial == "0000":
         return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# Polish PESEL validation
+# ---------------------------------------------------------------------------
+
+def pesel_check(pesel: str) -> bool:
+    """
+    Validate Polish PESEL number (11 digits with checksum) or partially masked
+    form (e.g. '890412xxxxx').
+    """
+    clean = pesel.strip()
+    if re.fullmatch(r"\d{6}[xX*]{5}", clean):
+        # Partially masked format: first 6 digits must be valid YYMMDD
+        m = int(clean[2:4])
+        d = int(clean[4:6])
+        return (1 <= (m % 20) <= 12) and (1 <= d <= 31)
+
+    if not re.fullmatch(r"\d{11}", clean):
+        return False
+
+    weights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3]
+    checksum = sum(int(clean[i]) * weights[i] for i in range(10)) % 10
+    control = (10 - checksum) % 10
+    return control == int(clean[10])
+
+
+# ---------------------------------------------------------------------------
+# Phone validation helper (offline phonenumbers wrapper)
+# ---------------------------------------------------------------------------
+
+def phone_validate(candidate: str) -> bool:
+    """
+    Optional phone validator using phonenumbers.
+    Returns True if phonenumbers parses it as a possible or valid number.
+    Does not reject test numbers (like 555-0xxx) if the regex matched.
+    """
+    clean = re.sub(r"[\s\(\)\.\-]", "", candidate)
+    if len(clean) < 7 or len(clean) > 16:
+        return False
+    try:
+        import phonenumbers
+        # Try international parse if starts with '+'
+        if candidate.strip().startswith("+"):
+            parsed = phonenumbers.parse(candidate, None)
+            return phonenumbers.is_possible_number(parsed)
+        # Try US fallback
+        parsed = phonenumbers.parse(candidate, "US")
+        return phonenumbers.is_possible_number(parsed)
+    except Exception:
+        # Fallback: if phonenumbers fails to parse, return True if digit count is plausible
+        return 7 <= len(clean) <= 15
 
 
 # ---------------------------------------------------------------------------
