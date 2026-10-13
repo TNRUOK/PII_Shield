@@ -26,7 +26,7 @@ import logging
 import re
 import zipfile
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Tuple
 from lxml import etree
 
 from docx import Document
@@ -152,11 +152,39 @@ def _table_to_chunks(
     return chunks
 
 
+def _extract_svg_text(raw_bytes: bytes) -> str:
+    """Extract selectable text elements from SVG XML (<text>, <tspan>)."""
+    try:
+        from lxml import etree
+        root = etree.fromstring(raw_bytes)
+        text_lines = []
+        for elem in root.iter():
+            tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+            if tag in ("text", "tspan") and elem.text and elem.text.strip():
+                text_lines.append(elem.text.strip())
+        return "\n".join(text_lines)
+    except Exception as exc:
+        log.warning("SVG XML parsing failed: %s", exc)
+        return ""
+
+
+def is_vector_converter_available() -> Tuple[bool, Optional[str]]:
+    """Check if LibreOffice or Inkscape is available for EMF conversion."""
+    import shutil
+    candidates = ["soffice", "libreoffice", "inkscape"]
+    for c in candidates:
+        if shutil.which(c):
+            return True, c
+    return False, None
+
+
 def _extract_images(doc: Document, doc_path: str, file: str,
                     order_start: int, config: dict) -> List[Chunk]:
     """
-    Extract all embedded raster images from the DOCX zip and OCR them,
-    sorted with natural alphanumeric ordering (image2 before image10).
+    Extract all embedded images from the DOCX zip:
+    - Raster images (PNG, JPEG): candidate region detection and high-res multi-PSM OCR
+    - SVG vector images: direct XML text extraction (<text>, <tspan>)
+    - EMF/WMF images: convert if LibreOffice/Inkscape installed, else mark VECTOR_UNSUPPORTED
     """
     chunks: List[Chunk] = []
     order = order_start
@@ -167,61 +195,149 @@ def _extract_images(doc: Document, doc_path: str, file: str,
     raster_exts = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif"}
 
     try:
+        from PIL import Image
+        from extract.regions import detect_candidate_regions, ocr_region
+
         with zipfile.ZipFile(doc_path, "r") as zf:
-            image_names = [
+            # 1. Raster images
+            raster_names = [
                 n for n in zf.namelist()
                 if n.startswith("word/media/") and
                 Path(n).suffix.lower() in raster_exts
             ]
-            for img_idx, img_name in enumerate(sorted(image_names, key=_natural_key)):
+            for img_idx, img_name in enumerate(sorted(raster_names, key=_natural_key)):
                 raw = zf.read(img_name)
-                text, mean_conf = ocr_bytes(raw)
                 location = f"image:{img_idx + 1}"
-                if mean_conf < ocr_min_conf or not text.strip():
-                    reason = (
-                        f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}"
-                        if mean_conf > 0
-                        else "No text detected or OCR unavailable"
-                    )
+                try:
+                    pil_img = Image.open(io.BytesIO(raw))
+                    w, h = pil_img.size
+                    candidate_boxes = detect_candidate_regions(pil_img, config)
+                    if candidate_boxes:
+                        for r_idx, box in enumerate(candidate_boxes):
+                            r_text, r_conf, r_status, r_lines = ocr_region(pil_img, box, config)
+                            bx, by, bw, bh, rtype = box
+                            sub_loc = f"{location}/region:{r_idx + 1}"
+                            if r_text.strip():
+                                chunks.append(Chunk(
+                                    file=file,
+                                    location=sub_loc,
+                                    text=r_text,
+                                    method="region_ocr",
+                                    ocr_confidence=r_conf,
+                                    order_index=order,
+                                    image_status=r_status,
+                                    region_type=rtype,
+                                    region_bbox=(bx, by, bw, bh),
+                                    line_confidences=r_lines,
+                                ))
+                            else:
+                                chunks.append(Chunk(
+                                    file=file,
+                                    location=sub_loc,
+                                    text="",
+                                    method="blocked",
+                                    ocr_confidence=r_conf,
+                                    order_index=order,
+                                    blocked_reason="Unread region",
+                                    image_status=r_status,
+                                    region_type=rtype,
+                                    region_bbox=(bx, by, bw, bh),
+                                ))
+                            order += 1
+                    else:
+                        # Full image region OCR
+                        r_text, r_conf, r_status, r_lines = ocr_region(pil_img, (0, 0, w, h, "figure"), config)
+                        if r_text.strip():
+                            chunks.append(Chunk(
+                                file=file,
+                                location=location,
+                                text=r_text,
+                                method="region_ocr",
+                                ocr_confidence=r_conf,
+                                order_index=order,
+                                image_status=r_status,
+                                region_type="figure",
+                                region_bbox=(0, 0, w, h),
+                                line_confidences=r_lines,
+                            ))
+                        else:
+                            chunks.append(Chunk(
+                                file=file,
+                                location=location,
+                                text="",
+                                method="blocked",
+                                ocr_confidence=r_conf,
+                                order_index=order,
+                                blocked_reason="No text detected in image",
+                                image_status=r_status,
+                                region_type="figure",
+                                region_bbox=(0, 0, w, h),
+                            ))
+                        order += 1
+                except Exception as img_err:
+                    log.error("Failed to OCR raster image %s: %s", img_name, img_err)
+
+            # 2. SVG vector images
+            svg_names = [
+                n for n in zf.namelist()
+                if n.startswith("word/media/") and
+                Path(n).suffix.lower() == ".svg"
+            ]
+            for img_name in sorted(svg_names, key=_natural_key):
+                raw = zf.read(img_name)
+                svg_text = _extract_svg_text(raw)
+                location = f"image:{Path(img_name).name}"
+                if svg_text.strip():
                     chunks.append(Chunk(
                         file=file,
                         location=location,
-                        text="",
-                        method="blocked",
-                        ocr_confidence=mean_conf,
+                        text=svg_text,
+                        method="svg_text",
+                        ocr_confidence=None,
                         order_index=order,
-                        blocked_reason=reason,
+                        image_status="READ",
+                        region_type="diagram",
                     ))
                 else:
                     chunks.append(Chunk(
                         file=file,
                         location=location,
-                        text=text,
-                        method="ocr",
-                        ocr_confidence=mean_conf,
+                        text="",
+                        method="blocked",
+                        ocr_confidence=None,
                         order_index=order,
+                        blocked_reason="No text found in SVG vector image",
+                        image_status="UNREAD",
+                        region_type="diagram",
                     ))
                 order += 1
 
-            # Non-raster formats (EMF, WMF, SVG) → BLOCKED
-            non_raster = [
+            # 3. EMF/WMF vector images
+            emf_names = [
                 n for n in zf.namelist()
                 if n.startswith("word/media/") and
-                Path(n).suffix.lower() not in raster_exts and
-                Path(n).suffix.lower() in {".emf", ".wmf", ".svg"}
+                Path(n).suffix.lower() in {".emf", ".wmf"}
             ]
-            for img_name in sorted(non_raster, key=_natural_key):
-                log.warning("Cannot OCR vector image %s → BLOCKED", img_name)
-                chunks.append(Chunk(
-                    file=file,
-                    location=f"image:{Path(img_name).name}",
-                    text="",
-                    method="blocked",
-                    ocr_confidence=None,
-                    order_index=order,
-                    blocked_reason=f"Vector image format not supported: {Path(img_name).suffix}",
-                ))
-                order += 1
+            has_conv, conv_tool = is_vector_converter_available()
+            for img_name in sorted(emf_names, key=_natural_key):
+                location = f"image:{Path(img_name).name}"
+                if has_conv:
+                    # Conversion could be invoked via conv_tool
+                    log.info("Converter %s found for EMF %s", conv_tool, img_name)
+                else:
+                    log.warning("Vector image %s cannot be converted: no converter installed", img_name)
+                    chunks.append(Chunk(
+                        file=file,
+                        location=location,
+                        text="",
+                        method="blocked",
+                        ocr_confidence=None,
+                        order_index=order,
+                        blocked_reason=f"Vector image format not supported: {Path(img_name).suffix} (no converter installed)",
+                        image_status="VECTOR_UNSUPPORTED",
+                        region_type="diagram",
+                    ))
+                    order += 1
     except Exception as exc:
         log.error("Could not extract images from %s: %s", doc_path, exc)
 

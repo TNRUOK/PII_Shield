@@ -29,12 +29,15 @@ class Chunk:
     file: str
     location: str
     text: str
-    method: Literal["native", "ocr", "blocked"]
+    method: str  # "native" | "ocr" | "region_ocr" | "svg_text" | "blocked"
     ocr_confidence: Optional[float]
     order_index: int
     blocked_reason: Optional[str] = None
     low_confidence: bool = False
     line_confidences: Optional[List[Tuple[str, float]]] = None
+    image_status: Optional[str] = None  # "READ" | "LOW_CONFIDENCE" | "UNREAD" | "VECTOR_UNSUPPORTED"
+    region_type: Optional[str] = None   # "table" | "figure" | "diagram" | "stamp"
+    region_bbox: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h)
 
     def is_blocked(self) -> bool:
         return self.method == "blocked"

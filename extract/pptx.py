@@ -109,42 +109,114 @@ def _extract_shape_chunks(
 
         table_counter[0] += 1
 
-    # --- Picture: OCR ---
+    # --- Picture: OCR / SVG / Vector ---
     if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
         try:
+            from PIL import Image
+            import io
+            from extract.regions import ocr_region, detect_candidate_regions
+            from extract.docx import _extract_svg_text
+
             img_bytes = shape.image.blob
-            text, mean_conf = ocr_bytes(img_bytes)
             location = f"slide:{slide_idx + 1}/image:{shape.shape_id}"
-            if mean_conf < ocr_min_conf or not text.strip():
-                if mean_conf == 0.0 and not text.strip():
-                    # No text in image (decorative)
-                    log.debug("Picture shape %d on slide %d: no text detected",
-                              shape.shape_id, slide_idx + 1)
+            content_type = getattr(shape.image, "content_type", "") or ""
+
+            if "svg" in content_type.lower():
+                svg_text = _extract_svg_text(img_bytes)
+                if svg_text.strip():
+                    chunks.append(Chunk(
+                        file=file,
+                        location=location,
+                        text=svg_text,
+                        method="svg_text",
+                        ocr_confidence=None,
+                        order_index=order_ref[0],
+                        image_status="READ",
+                        region_type="diagram",
+                    ))
                 else:
                     chunks.append(Chunk(
                         file=file,
                         location=location,
                         text="",
                         method="blocked",
-                        ocr_confidence=mean_conf,
+                        ocr_confidence=None,
                         order_index=order_ref[0],
-                        blocked_reason=(
-                            f"OCR confidence {mean_conf:.1f} below threshold {ocr_min_conf}"
-                        ),
+                        blocked_reason="No text found in SVG vector image",
+                        image_status="UNREAD",
+                        region_type="diagram",
                     ))
-                    order_ref[0] += 1
-            else:
-                chunks.append(Chunk(
-                    file=file,
-                    location=location,
-                    text=text,
-                    method="ocr",
-                    ocr_confidence=mean_conf,
-                    order_index=order_ref[0],
-                ))
                 order_ref[0] += 1
+            else:
+                pil_img = Image.open(io.BytesIO(img_bytes))
+                w, h = pil_img.size
+                candidate_boxes = detect_candidate_regions(pil_img, config)
+                if candidate_boxes:
+                    for r_idx, box in enumerate(candidate_boxes):
+                        r_text, r_conf, r_status, r_lines = ocr_region(pil_img, box, config)
+                        bx, by, bw, bh, rtype = box
+                        sub_loc = f"{location}/region:{r_idx + 1}"
+                        if r_text.strip():
+                            chunks.append(Chunk(
+                                file=file,
+                                location=sub_loc,
+                                text=r_text,
+                                method="region_ocr",
+                                ocr_confidence=r_conf,
+                                order_index=order_ref[0],
+                                image_status=r_status,
+                                region_type=rtype,
+                                region_bbox=(bx, by, bw, bh),
+                                line_confidences=r_lines,
+                            ))
+                        else:
+                            chunks.append(Chunk(
+                                file=file,
+                                location=sub_loc,
+                                text="",
+                                method="blocked",
+                                ocr_confidence=r_conf,
+                                order_index=order_ref[0],
+                                blocked_reason="Unread region",
+                                image_status=r_status,
+                                region_type=rtype,
+                                region_bbox=(bx, by, bw, bh),
+                            ))
+                        order_ref[0] += 1
+                else:
+                    r_text, r_conf, r_status, r_lines = ocr_region(pil_img, (0, 0, w, h, "figure"), config)
+                    if r_text.strip():
+                        chunks.append(Chunk(
+                            file=file,
+                            location=location,
+                            text=r_text,
+                            method="region_ocr",
+                            ocr_confidence=r_conf,
+                            order_index=order_ref[0],
+                            image_status=r_status,
+                            region_type="figure",
+                            region_bbox=(0, 0, w, h),
+                            line_confidences=r_lines,
+                        ))
+                    else:
+                        if r_conf == 0.0 and not r_text.strip():
+                            log.debug("Picture shape %d on slide %d: no text detected", shape.shape_id, slide_idx + 1)
+                        else:
+                            chunks.append(Chunk(
+                                file=file,
+                                location=location,
+                                text="",
+                                method="blocked",
+                                ocr_confidence=r_conf,
+                                order_index=order_ref[0],
+                                blocked_reason=f"OCR confidence {r_conf:.1f} below threshold",
+                                image_status=r_status,
+                                region_type="figure",
+                                region_bbox=(0, 0, w, h),
+                            ))
+                            order_ref[0] += 1
         except Exception as exc:
-            log.warning("Could not OCR picture on slide %d: %s", slide_idx + 1, exc)
+            log.warning("Could not process picture on slide %d: %s", slide_idx + 1, exc)
 
     return chunks
 

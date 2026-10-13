@@ -319,6 +319,41 @@ def main():
     print("=" * 70)
     print_summary_table(file_summaries)
 
+    # --- Per-source chunk breakdown ---
+    print("\n" + "=" * 70)
+    print("PER-SOURCE CHUNK BREAKDOWN")
+    print("=" * 70)
+    all_chunks_by_doc: Dict[str, List] = {}
+    for doc_path in doc_files:
+        chunks = route(str(doc_path), config)
+        all_chunks_by_doc[doc_path.name] = chunks
+        by_method: Dict[str, int] = {}
+        for c in chunks:
+            by_method[c.method] = by_method.get(c.method, 0) + 1
+        print(f"  {doc_path.name}: " + ", ".join(f"{m}={n}" for m, n in sorted(by_method.items())))
+
+    # --- Figure token recall per figure ---
+    print("\n" + "=" * 70)
+    print("FIGURE TOKEN RECALL")
+    print("=" * 70)
+    for doc_path in doc_files:
+        gt_path = gt_dir / (doc_path.stem + ".json")
+        if not gt_path.exists():
+            continue
+        with open(gt_path, "r", encoding="utf-8") as fh:
+            gt = json.load(fh)
+        figure_tokens = gt.get("figure_tokens", {})
+        if not figure_tokens:
+            continue
+        chunks = all_chunks_by_doc.get(doc_path.name, route(str(doc_path), config))
+        extracted_text = " ".join(c.text for c in chunks if c.text)
+        print(f"\n  {doc_path.name}:")
+        for fig_id, tokens in figure_tokens.items():
+            found = sum(1 for t in tokens if t.lower() in extracted_text.lower())
+            pct = 100.0 * found / max(len(tokens), 1)
+            status = "✅" if pct >= 80 else ("⚠️" if pct >= 50 else "❌")
+            print(f"    {status} Figure {fig_id}: {found}/{len(tokens)} tokens ({pct:.0f}%)")
+
     print("\n" + "=" * 70)
     print("THROUGHPUT PERFORMANCE")
     print("=" * 70)

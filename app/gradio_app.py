@@ -191,20 +191,44 @@ def process_files(
     pii_df        = _entities_to_df(all_entities)
 
     # Build report summary text
+    from extract.docx import is_vector_converter_available
     tess_status = "✅ Installed" if is_tesseract_available() else "⚠️ Not Installed"
+    has_conv, conv_tool = is_vector_converter_available()
+    conv_status = f"✅ {conv_tool}" if has_conv else "⚠️ Not installed (EMF/WMF cannot be converted)"
+
     summary_lines = [
         "## PII Shield — Run Summary\n",
-        f"OCR Engine (Tesseract): **{tess_status}**\n",
+        f"**OCR Engine (Tesseract):** {tess_status}  \n"
+        f"**Vector Converter (EMF/WMF):** {conv_status}\n",
     ]
+
+    # Check any multimodal safety issues across all files
+    any_mm_unsafe = any(not fs.get("multimodal_safe", True) for fs in file_summaries)
+    if any_mm_unsafe:
+        summary_lines.append(
+            "> ⚠️ **MULTIMODAL SAFETY WARNING**: One or more files contain unverified image regions "
+            "(UNREAD, UNVERIFIED, or VECTOR_UNSUPPORTED). PII in those regions may have been missed. "
+            "Document is NOT fully verified.\n"
+        )
+
     for fs in file_summaries:
         safe = "✅ YES" if fs["leak_check"]["downstream_safe"] else "❌ NO"
+        mm_safe = "✅ YES" if fs.get("multimodal_safe", True) else "⚠️ UNVERIFIED REGIONS"
+        cov = fs.get("image_coverage", {})
+        img_line = (
+            f"Image regions: total={cov.get('total_image_regions', 0)}, "
+            f"read={cov.get('read', 0)}, unread={cov.get('unread', 0)}"
+        )
         summary_lines.append(
             f"**{Path(fs['file']).name}**  \n"
             f"Chunks: {fs['chunk_count']} (native={fs['native_chunks']}, "
-            f"ocr={fs['ocr_chunks']}, blocked={fs['blocked_chunks']})  \n"
+            f"ocr={fs['ocr_chunks']}, region_ocr={fs.get('region_ocr_chunks', 0)}, "
+            f"svg={fs.get('svg_chunks', 0)}, blocked={fs['blocked_chunks']})  \n"
             f"PII found: {fs['pii_count']} entities  \n"
             f"Risk level: **{fs['risk_level']}**  \n"
             f"Downstream safe: **{safe}**  \n"
+            f"Multimodal safe: **{mm_safe}**  \n"
+            f"{img_line}  \n"
             f"PII by type: {json.dumps(fs['pii_by_type'], indent=0)}  \n"
         )
 
