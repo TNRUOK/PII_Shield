@@ -493,6 +493,31 @@ RULES = [
         "soft_penalty": 0.0,
         "sensitivity": "Low",
     },
+
+    # --- OCR-tolerant email: (at)/[at]/(AT)/[dot] forms and spaced @ ---
+    # Only evaluated on OCR chunks (is_ocr=True) so native precision does not drop.
+    # Requires an explicit email signal (@, (at), [at]) AND a known TLD-like suffix.
+    {
+        "pattern": _compile(
+            r"[a-zA-Z0-9._%+\-]+"
+            r"(?:\s*@\s*|\s*\(at\)\s*|\s*\[at\]\s*|\s*AT\s+)"
+            r"[a-zA-Z0-9.\-]+"
+            r"(?:\s*\.\s*|\s*\[dot\]\s*|\s*\(dot\)\s*)"
+            + _KNOWN_TLDS +
+            r"\b"
+        ),
+        "entity_type": "EMAIL",
+        "ocr_only": True,
+        "validator": lambda t: (
+            "@" in t
+            or "(at)" in t.lower()
+            or "[at]" in t.lower()
+            or " at " in t.lower()
+        ),
+        "confidence": 0.82,
+        "soft_penalty": 0.0,
+        "sensitivity": "Medium",
+    },
 ]
 
 
