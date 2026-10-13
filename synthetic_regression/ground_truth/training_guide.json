@@ -1,0 +1,159 @@
+{
+  "document": "training_guide.docx",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "M. T. Achebe",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMAIL",
+      "text": "m.achebe@cadencecorp.net",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-88210",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PHONE",
+      "text": "+44 20 7555 0171",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "T. Lindqvist",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMAIL",
+      "text": "t.lindqvist@cadencecorp.net",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-99341",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PHONE",
+      "text": "+46 8 5555 0121",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "P. S. Raghavan",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMAIL",
+      "text": "p.raghavan@cadencecorp.net",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-77124",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PHONE",
+      "text": "+91 80 4555 0182",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "Kavita Reddy",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMAIL",
+      "text": "k.reddy@cadencecorp.net",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-66219",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PHONE",
+      "text": "+91 22 4555 0117",
+      "location": "table:1",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "Achebe",
+      "location": "body",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "Lindqvist",
+      "location": "body",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "Raghavan",
+      "location": "body",
+      "source": "native",
+      "category": "g"
+    },
+    {
+      "type": "PERSON",
+      "text": "Zachary Sterling",
+      "location": "image:architecture_contact.svg",
+      "source": "svg",
+      "category": "o"
+    },
+    {
+      "type": "EMAIL",
+      "text": "z.sterling@cadencecorp.net",
+      "location": "image:architecture_contact.svg",
+      "source": "svg",
+      "category": "o"
+    }
+  ],
+  "must_not_redact": [
+    "employee identifiers",
+    "national identifiers",
+    "Board Risk Committee",
+    "Data Privacy Office"
+  ],
+  "figures": {}
+}

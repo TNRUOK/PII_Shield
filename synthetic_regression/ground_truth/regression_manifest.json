@@ -1,0 +1,203 @@
+{
+  "description": "Synthetic Regression Pack Manifest",
+  "must_not_redact": [
+    "Board Risk Committee",
+    "Cadence Financial Group, 100 Wall Street, New York, NY 10005",
+    "Data Privacy Office",
+    "NATIONAL ID",
+    "at an appropriate level",
+    "at least",
+    "contingency",
+    "distinguishing",
+    "employee identifiers",
+    "great",
+    "national identifiers",
+    "that",
+    "what"
+  ],
+  "figures": {
+    "figure_k": {
+      "page": 2,
+      "type": "form_and_badge",
+      "tokens": [
+        "Harold",
+        "Finch",
+        "h.finch@cadencecorp.net",
+        "14",
+        "July",
+        "1991",
+        "Marcus",
+        "Vance",
+        "mvance@cadencecorp.net",
+        "900-55-2043",
+        "Sunita",
+        "Narayan",
+        "snarayan@cadencecorp.net",
+        "ABCDE1234F",
+        "Elena",
+        "Rostova",
+        "erostova@cadencecorp.net",
+        "N8841295",
+        "SECURITY",
+        "BADGE",
+        "Theresa",
+        "Lindqvist",
+        "DIR-0042",
+        "DATE",
+        "OF",
+        "BIRTH",
+        "28",
+        "February",
+        "1979"
+      ],
+      "bbox": [
+        120,
+        1040,
+        1358,
+        1852
+      ]
+    },
+    "figure_l": {
+      "page": 3,
+      "type": "dark_console",
+      "tokens": [
+        "M.",
+        "T.",
+        "Achebe",
+        "m.achebe@cadencecorp.net",
+        "T.",
+        "Lindqvist",
+        "t.lindqvist@cadencecorp.net",
+        "P.",
+        "S.",
+        "Raghavan",
+        "p.raghavan@cadencecorp.net",
+        "Kavita",
+        "Reddy",
+        "k.reddy@cadencecorp.net",
+        "Arthur",
+        "Pendelton",
+        "a.pendelton@cadencecorp.net",
+        "Beatrix",
+        "Thorne",
+        "b.thorne@cadencecorp.net",
+        "Gideon",
+        "Cross",
+        "g.cross@cadencecorp.net",
+        "Yuki",
+        "Tanaka",
+        "y.tanaka@cadencecorp.net",
+        "Fiona",
+        "MacLeod",
+        "f.macleod@cadencecorp.net",
+        "Damian",
+        "O'Connor",
+        "d.oconnor@cadencecorp.net"
+      ],
+      "bbox": [
+        120,
+        160,
+        1520,
+        960
+      ]
+    },
+    "figure_m": {
+      "page": 3,
+      "type": "dashboard",
+      "tokens": [
+        "Cedric",
+        "Vance",
+        "94.2%",
+        "Amina",
+        "Qasim",
+        "88.5%",
+        "P.",
+        "S.",
+        "Raghavan",
+        "76.0%",
+        "Nicolette",
+        "Dupuis",
+        "98.1%"
+      ],
+      "bbox": [
+        120,
+        1000,
+        1120,
+        1500
+      ]
+    },
+    "figure_n": {
+      "page": 3,
+      "type": "identity_record",
+      "tokens": [
+        "Lukas",
+        "Brauer",
+        "l.brauer@cadencecorp.net",
+        "+49 69 5555 0177",
+        "EMP-38104"
+      ],
+      "bbox": [
+        120,
+        1540,
+        540,
+        1860
+      ]
+    },
+    "figure_p": {
+      "page": 3,
+      "type": "tiny_text_unverified",
+      "tokens": [
+        "Lysander",
+        "Vance"
+      ],
+      "bbox": [
+        600,
+        1590,
+        900,
+        1690
+      ],
+      "expected_status": "UNVERIFIED"
+    },
+    "figure_l_pptx": {
+      "slide": 2,
+      "type": "dark_console_pptx",
+      "tokens": [
+        "M.",
+        "T.",
+        "Achebe",
+        "m.achebe@cadencecorp.net",
+        "T.",
+        "Lindqvist",
+        "t.lindqvist@cadencecorp.net",
+        "P.",
+        "S.",
+        "Raghavan",
+        "p.raghavan@cadencecorp.net",
+        "Kavita",
+        "Reddy",
+        "k.reddy@cadencecorp.net",
+        "Arthur",
+        "Pendelton",
+        "a.pendelton@cadencecorp.net",
+        "Beatrix",
+        "Thorne",
+        "b.thorne@cadencecorp.net",
+        "Gideon",
+        "Cross",
+        "g.cross@cadencecorp.net",
+        "Yuki",
+        "Tanaka",
+        "y.tanaka@cadencecorp.net",
+        "Fiona",
+        "MacLeod",
+        "f.macleod@cadencecorp.net",
+        "Damian",
+        "O'Connor",
+        "d.oconnor@cadencecorp.net"
+      ]
+    }
+  },
+  "total_pdf_entities": 75,
+  "total_docx_entities": 21,
+  "total_pptx_entities": 5
+}

@@ -1,0 +1,690 @@
+{
+  "document": "scanned_policy.pdf",
+  "entities": [
+    {
+      "type": "PHONE",
+      "text": "+44 20 7555 0171",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+44 20 75550171",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+44 7700 555 0163",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+91 80 4555 0182",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+91 22 4555 0117",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+91 98860 55107",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+33 1 5555 0144",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+33 15555 0144",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+65 6555 0172",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+49 69 5555 0177",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+46 8 5555 0121",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+46 70 555 0188",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+48 22 555 0164",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+48 512 555 0180",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+63 917 555 0119",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+1 (646) 555-0203",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+1 212 555-0147",
+      "location": "page:1",
+      "source": "page_ocr",
+      "category": "a"
+    },
+    {
+      "type": "SSN",
+      "text": "900-55-2043",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "b"
+    },
+    {
+      "type": "SSN",
+      "text": "900-42-7781",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "b"
+    },
+    {
+      "type": "SSN",
+      "text": "8827",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "b"
+    },
+    {
+      "type": "ACCOUNT_NUMBER",
+      "text": "card ending 2218",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "e"
+    },
+    {
+      "type": "ACCOUNT_NUMBER",
+      "text": "savings account ending 7741",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "e"
+    },
+    {
+      "type": "ADDRESS",
+      "text": "88 Willowbank Court, Hoboken, NJ 07030",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "d"
+    },
+    {
+      "type": "ADDRESS",
+      "text": "1180 Ashwood Lane, Apartment 4C, Jersey City, NJ 07302",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "d"
+    },
+    {
+      "type": "ADDRESS",
+      "text": "2214 Palmetto Crescent, Coral Gables, FL 33134",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "d"
+    },
+    {
+      "type": "VENDOR_ID",
+      "text": "MER-PH-2214",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "f"
+    },
+    {
+      "type": "PESEL",
+      "text": "890412xxxxx",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "f"
+    },
+    {
+      "type": "DIRECTOR_ID",
+      "text": "DIR-0042",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "f"
+    },
+    {
+      "type": "VENDOR_ID",
+      "text": "MER-IN-4471",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "f"
+    },
+    {
+      "type": "VENDOR_ID",
+      "text": "MER-PL-1187",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "f"
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-38104",
+      "location": "page:2",
+      "source": "page_ocr",
+      "category": "f"
+    },
+    {
+      "type": "PERSON",
+      "text": "Harold V. Finch",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "EMAIL",
+      "text": "h.finch@cadencecorp.net",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "DATE_OF_BIRTH",
+      "text": "14 July 1991",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PERSON",
+      "text": "Marcus Vance",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "EMAIL",
+      "text": "mvance@cadencecorp.net",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "SSN",
+      "text": "900-55-2043",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PERSON",
+      "text": "Sunita Narayan",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "EMAIL",
+      "text": "snarayan@cadencecorp.net",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PAN",
+      "text": "ABCDE1234F",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PERSON",
+      "text": "Elena Rostova",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "EMAIL",
+      "text": "erostova@cadencecorp.net",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PASSPORT",
+      "text": "N8841295",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PERSON",
+      "text": "Theresa Lindqvist",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "DIRECTOR_ID",
+      "text": "DIR-0042",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "DATE_OF_BIRTH",
+      "text": "28 February 1979",
+      "location": "page:2",
+      "source": "region_ocr",
+      "category": "k"
+    },
+    {
+      "type": "PERSON",
+      "text": "M. T. Achebe",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "m.achebe@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "T. Lindqvist",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "t.lindqvist@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "P. S. Raghavan",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "p.raghavan@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Kavita Reddy",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "k.reddy@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Arthur Pendelton",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "a.pendelton@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Beatrix Thorne",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "b.thorne@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Gideon Cross",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "g.cross@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Yuki Tanaka",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "y.tanaka@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Fiona MacLeod",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "f.macleod@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Damian O'Connor",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "EMAIL",
+      "text": "d.oconnor@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "l"
+    },
+    {
+      "type": "PERSON",
+      "text": "Cedric Vance",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "m"
+    },
+    {
+      "type": "PERSON",
+      "text": "Amina Qasim",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "m"
+    },
+    {
+      "type": "PERSON",
+      "text": "P. S. Raghavan",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "m"
+    },
+    {
+      "type": "PERSON",
+      "text": "Nicolette Dupuis",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "m"
+    },
+    {
+      "type": "PERSON",
+      "text": "Lukas Brauer",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "n"
+    },
+    {
+      "type": "EMAIL",
+      "text": "l.brauer@cadencecorp.net",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "n"
+    },
+    {
+      "type": "PHONE",
+      "text": "+49 69 5555 0177",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "n"
+    },
+    {
+      "type": "EMPLOYEE_ID",
+      "text": "EMP-38104",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "n"
+    },
+    {
+      "type": "PERSON",
+      "text": "Lysander Vance",
+      "location": "page:3",
+      "source": "region_ocr",
+      "category": "p",
+      "tricky": true
+    }
+  ],
+  "must_not_redact": [
+    "employee identifiers",
+    "national identifiers",
+    "distinguishing",
+    "contingency",
+    "Board Risk Committee",
+    "Data Privacy Office",
+    "NATIONAL ID",
+    "that",
+    "what",
+    "at least",
+    "great",
+    "at an appropriate level",
+    "Cadence Financial Group, 100 Wall Street, New York, NY 10005"
+  ],
+  "figures": {
+    "figure_k": {
+      "page": 2,
+      "type": "form_and_badge",
+      "tokens": [
+        "Harold",
+        "Finch",
+        "h.finch@cadencecorp.net",
+        "14",
+        "July",
+        "1991",
+        "Marcus",
+        "Vance",
+        "mvance@cadencecorp.net",
+        "900-55-2043",
+        "Sunita",
+        "Narayan",
+        "snarayan@cadencecorp.net",
+        "ABCDE1234F",
+        "Elena",
+        "Rostova",
+        "erostova@cadencecorp.net",
+        "N8841295",
+        "SECURITY",
+        "BADGE",
+        "Theresa",
+        "Lindqvist",
+        "DIR-0042",
+        "DATE",
+        "OF",
+        "BIRTH",
+        "28",
+        "February",
+        "1979"
+      ],
+      "bbox": [
+        120,
+        1040,
+        1358,
+        1852
+      ]
+    },
+    "figure_l": {
+      "page": 3,
+      "type": "dark_console",
+      "tokens": [
+        "M.",
+        "T.",
+        "Achebe",
+        "m.achebe@cadencecorp.net",
+        "T.",
+        "Lindqvist",
+        "t.lindqvist@cadencecorp.net",
+        "P.",
+        "S.",
+        "Raghavan",
+        "p.raghavan@cadencecorp.net",
+        "Kavita",
+        "Reddy",
+        "k.reddy@cadencecorp.net",
+        "Arthur",
+        "Pendelton",
+        "a.pendelton@cadencecorp.net",
+        "Beatrix",
+        "Thorne",
+        "b.thorne@cadencecorp.net",
+        "Gideon",
+        "Cross",
+        "g.cross@cadencecorp.net",
+        "Yuki",
+        "Tanaka",
+        "y.tanaka@cadencecorp.net",
+        "Fiona",
+        "MacLeod",
+        "f.macleod@cadencecorp.net",
+        "Damian",
+        "O'Connor",
+        "d.oconnor@cadencecorp.net"
+      ],
+      "bbox": [
+        120,
+        160,
+        1520,
+        960
+      ]
+    },
+    "figure_m": {
+      "page": 3,
+      "type": "dashboard",
+      "tokens": [
+        "Cedric",
+        "Vance",
+        "94.2%",
+        "Amina",
+        "Qasim",
+        "88.5%",
+        "P.",
+        "S.",
+        "Raghavan",
+        "76.0%",
+        "Nicolette",
+        "Dupuis",
+        "98.1%"
+      ],
+      "bbox": [
+        120,
+        1000,
+        1120,
+        1500
+      ]
+    },
+    "figure_n": {
+      "page": 3,
+      "type": "identity_record",
+      "tokens": [
+        "Lukas",
+        "Brauer",
+        "l.brauer@cadencecorp.net",
+        "+49 69 5555 0177",
+        "EMP-38104"
+      ],
+      "bbox": [
+        120,
+        1540,
+        540,
+        1860
+      ]
+    },
+    "figure_p": {
+      "page": 3,
+      "type": "tiny_text_unverified",
+      "tokens": [
+        "Lysander",
+        "Vance"
+      ],
+      "bbox": [
+        600,
+        1590,
+        900,
+        1690
+      ],
+      "expected_status": "UNVERIFIED"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "document": "org_pack.pptx",
+  "entities": [
+    {
+      "type": "PERSON",
+      "text": "Marcus Vance",
+      "location": "slide:1",
+      "source": "native",
+      "category": "b"
+    },
+    {
+      "type": "SSN",
+      "text": "900-55-2043",
+      "location": "slide:1",
+      "source": "native",
+      "category": "b"
+    },
+    {
+      "type": "ADDRESS",
+      "text": "88 Willowbank Court, Hoboken, NJ 07030",
+      "location": "slide:1",
+      "source": "native",
+      "category": "d"
+    },
+    {
+      "type": "PHONE",
+      "text": "+44 20 7555 0171",
+      "location": "slide:1",
+      "source": "native",
+      "category": "a"
+    },
+    {
+      "type": "PHONE",
+      "text": "+65 6555 0172",
+      "location": "slide:1",
+      "source": "native",
+      "category": "a"
+    }
+  ],
+  "must_not_redact": [],
+  "figures": {
+    "figure_l_pptx": {
+      "slide": 2,
+      "type": "dark_console_pptx",
+      "tokens": [
+        "M.",
+        "T.",
+        "Achebe",
+        "m.achebe@cadencecorp.net",
+        "T.",
+        "Lindqvist",
+        "t.lindqvist@cadencecorp.net",
+        "P.",
+        "S.",
+        "Raghavan",
+        "p.raghavan@cadencecorp.net",
+        "Kavita",
+        "Reddy",
+        "k.reddy@cadencecorp.net",
+        "Arthur",
+        "Pendelton",
+        "a.pendelton@cadencecorp.net",
+        "Beatrix",
+        "Thorne",
+        "b.thorne@cadencecorp.net",
+        "Gideon",
+        "Cross",
+        "g.cross@cadencecorp.net",
+        "Yuki",
+        "Tanaka",
+        "y.tanaka@cadencecorp.net",
+        "Fiona",
+        "MacLeod",
+        "f.macleod@cadencecorp.net",
+        "Damian",
+        "O'Connor",
+        "d.oconnor@cadencecorp.net"
+      ]
+    }
+  }
+}

@@ -1,0 +1,293 @@
+{
+  "entity_metrics": {
+    "ACCOUNT_NUMBER": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "ADDRESS": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 4,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "DATE_OF_BIRTH": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "DIRECTOR_ID": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "EMAIL": {
+      "tp": 14,
+      "fp": 53,
+      "fn": 6,
+      "precision": 0.209,
+      "recall": 0.7,
+      "f1": 0.3218
+    },
+    "EMPLOYEE_ID": {
+      "tp": 6,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.8571,
+      "recall": 1.0,
+      "f1": 0.9231
+    },
+    "GOVERNMENT_ID": {
+      "tp": 0,
+      "fp": 4,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "PAN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PASSPORT": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "PERSON": {
+      "tp": 23,
+      "fp": 49,
+      "fn": 7,
+      "precision": 0.3194,
+      "recall": 0.7667,
+      "f1": 0.451
+    },
+    "PESEL": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "PHONE": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 19,
+      "precision": 1.0,
+      "recall": 0.2083,
+      "f1": 0.3448
+    },
+    "SSN": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 5,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "SUSPECT_OCR": {
+      "tp": 0,
+      "fp": 2,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "VENDOR_ID": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "OVERALL": {
+      "tp": 49,
+      "fp": 109,
+      "fn": 52,
+      "precision": 0.3101,
+      "recall": 0.4851,
+      "f1": 0.3784
+    }
+  },
+  "structure_retention": {},
+  "throughput": [
+    {
+      "file": "org_pack.pptx",
+      "seconds": 4.836076899897307,
+      "pages": 2,
+      "ppm": 24.813501208499844
+    },
+    {
+      "file": "scanned_policy.pdf",
+      "seconds": 7.611555399838835,
+      "pages": 3,
+      "ppm": 23.648254600342433
+    },
+    {
+      "file": "training_guide.docx",
+      "seconds": 4.331987600307912,
+      "pages": 1,
+      "ppm": 13.850455157289758
+    }
+  ],
+  "category_breakdown": {
+    "b": {
+      "total": 5,
+      "detected": 1,
+      "missed": 4
+    },
+    "d": {
+      "total": 4,
+      "detected": 0,
+      "missed": 4
+    },
+    "a": {
+      "total": 19,
+      "detected": 5,
+      "missed": 14
+    },
+    "e": {
+      "total": 2,
+      "detected": 0,
+      "missed": 2
+    },
+    "f": {
+      "total": 6,
+      "detected": 1,
+      "missed": 5
+    },
+    "k": {
+      "total": 15,
+      "detected": 5,
+      "missed": 10
+    },
+    "l": {
+      "total": 20,
+      "detected": 18,
+      "missed": 2
+    },
+    "m": {
+      "total": 4,
+      "detected": 4,
+      "missed": 0
+    },
+    "n": {
+      "total": 4,
+      "detected": 2,
+      "missed": 2
+    },
+    "p": {
+      "total": 1,
+      "detected": 0,
+      "missed": 1
+    },
+    "g": {
+      "total": 19,
+      "detected": 13,
+      "missed": 6
+    },
+    "o": {
+      "total": 2,
+      "detected": 0,
+      "missed": 2
+    }
+  },
+  "wrongly_redacted_phrases": [
+    {
+      "phrase": "NATIONAL ID",
+      "doc": "training_guide.docx"
+    },
+    {
+      "phrase": "at an appropriate level",
+      "doc": "scanned_policy.pdf"
+    },
+    {
+      "phrase": "at least",
+      "doc": "scanned_policy.pdf"
+    },
+    {
+      "phrase": "contingency",
+      "doc": "scanned_policy.pdf"
+    },
+    {
+      "phrase": "contingency",
+      "doc": "training_guide.docx"
+    },
+    {
+      "phrase": "distinguishing",
+      "doc": "scanned_policy.pdf"
+    },
+    {
+      "phrase": "employee identifiers",
+      "doc": "training_guide.docx"
+    },
+    {
+      "phrase": "great",
+      "doc": "scanned_policy.pdf"
+    },
+    {
+      "phrase": "national identifiers",
+      "doc": "training_guide.docx"
+    },
+    {
+      "phrase": "that",
+      "doc": "scanned_policy.pdf"
+    },
+    {
+      "phrase": "what",
+      "doc": "scanned_policy.pdf"
+    }
+  ],
+  "figure_token_recalls": {
+    "figure_k": {
+      "total_tokens": 29,
+      "matched": 24,
+      "recall": 0.8276
+    },
+    "figure_l": {
+      "total_tokens": 32,
+      "matched": 32,
+      "recall": 1.0
+    },
+    "figure_m": {
+      "total_tokens": 13,
+      "matched": 13,
+      "recall": 1.0
+    },
+    "figure_n": {
+      "total_tokens": 5,
+      "matched": 3,
+      "recall": 0.6
+    },
+    "figure_p": {
+      "total_tokens": 2,
+      "matched": 1,
+      "recall": 0.5
+    },
+    "figure_l_pptx": {
+      "total_tokens": 32,
+      "matched": 32,
+      "recall": 1.0
+    }
+  }
+}
