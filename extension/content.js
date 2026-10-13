@@ -119,10 +119,13 @@ function findPromptInput() {
   const selectors = [
     "#prompt-textarea",                           // ChatGPT
     "div#prompt-textarea",                         // ChatGPT modern ProseMirror/Lexical
+    "div[id='prompt-textarea']",
+    "div[id='prompt-textarea'][contenteditable='true']",
     "textarea#prompt-textarea",                    // ChatGPT legacy
+    "div[contenteditable='true'][role='textbox']", // Generic LLM textbox
+    "div[contenteditable='true'][data-placeholder]",
     "div.ProseMirror[contenteditable='true']",     // Claude
     "div.rich-textarea [contenteditable='true']",  // Gemini
-    "div[contenteditable='true'][role='textbox']", // Generic LLM textbox
     "div[contenteditable='true']",
     "textarea[placeholder]",
     "textarea",
@@ -151,7 +154,15 @@ function getElementText(el) {
 
 async function setElementText(el, text) {
   if (!el) return false;
-  el.focus();
+  try {
+    el.focus();
+    el.click();
+  } catch (_) {}
+
+  // Always copy text to clipboard as guaranteed fallback
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_) {}
 
   if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
     // React value-tracker override
@@ -168,50 +179,77 @@ async function setElementText(el, text) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
-  } else {
-    // Contenteditable (ProseMirror / Lexical / CodeMirror):
-    // execCommand is deprecated and silently fails in modern Chrome.
-    // Most reliable approach: write to clipboard + dispatch synthetic Ctrl+A + paste.
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (_) {
-      // Clipboard write blocked — fall through to direct innerText
-    }
+  }
 
-    // Select-all then insert via execCommand (works in many editors)
+  // Contenteditable (ChatGPT / Claude / Gemini / Copilot):
+  // Layer 1: Selection range + execCommand
+  try {
     const selection = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(el);
     selection.removeAllRanges();
     selection.addRange(range);
+    document.execCommand("insertText", false, text);
+  } catch (_) {}
 
-    let executed = false;
+  // Layer 2: Synthetic beforeinput (Lexical native handler)
+  if (!el.textContent || !el.textContent.trim()) {
     try {
-      executed = document.execCommand("insertText", false, text);
-    } catch (_) {
-      executed = false;
-    }
-
-    if (!executed) {
-      // Fallback: dispatch a paste event with the text in clipboardData.
-      // This is the only method that reliably triggers Lexical/ProseMirror state updates.
-      try {
-        const dt = new DataTransfer();
-        dt.setData("text/plain", text);
-        el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
-        executed = true;
-      } catch (_) {
-        executed = false;
-      }
-    }
-
-    if (!executed) {
-      // Last resort: direct DOM write + InputEvent
-      el.innerText = text;
-      el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-    }
-    return executed;
+      const beforeInput = new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertText",
+        data: text,
+      });
+      el.dispatchEvent(beforeInput);
+    } catch (_) {}
   }
+
+  // Layer 3: Structured paragraphs (Lexical / ProseMirror DOM representation)
+  if (!el.textContent || !el.textContent.trim()) {
+    try {
+      el.innerHTML = "";
+      const lines = text.split("\n");
+      for (const line of lines) {
+        const p = document.createElement("p");
+        if (line.length > 0) {
+          p.textContent = line;
+        } else {
+          p.appendChild(document.createElement("br"));
+        }
+        el.appendChild(p);
+      }
+      el.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          inputType: "insertText",
+          data: text,
+        })
+      );
+    } catch (_) {
+      el.innerText = text;
+    }
+  }
+
+  // Layer 4: Events to trigger framework state sync
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+
+  // Layer 5: Paste event dispatch
+  try {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    el.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+  } catch (_) {}
+
+  // Verification: Did text actually get populated into the DOM?
+  return Boolean(el.textContent && el.textContent.trim().length > 0);
 }
 
 // Perform In-Place Prompt Shielding

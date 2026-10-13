@@ -84,7 +84,7 @@ async function handleRequest(request) {
           method: "POST",
           body: formData,
         },
-        30000
+        180000 // Allow up to 3 minutes for multi-page documents/PDFs
       );
       if (!res.ok) throw new Error(`Bridge returned HTTP ${res.status}`);
       return await res.json();
