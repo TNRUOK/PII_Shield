@@ -186,20 +186,26 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
             native_pages[page_num] = native_text
             # Extract embedded images on native pages for region OCR
             try:
-                from extract.regions import ocr_region
+                from extract.regions import ocr_region, is_duplicate_region_text
                 img_list = page.get_images(full=True)
                 emb_regs = []
+                page_area = (page.rect.width * 2) * (page.rect.height * 2)
                 for img_idx, img_info in enumerate(img_list):
                     xref = img_info[0]
                     base_img = doc.extract_image(xref)
                     if base_img and "image" in base_img:
                         w, h = base_img.get("width", 0), base_img.get("height", 0)
+                        # Skip full-page background scan images
+                        if (w * h) >= 0.85 * page_area:
+                            continue
                         if w >= 120 and h >= 60:
                             import io
                             from PIL import Image
                             pil_emb = Image.open(io.BytesIO(base_img["image"]))
                             bbox = (0, 0, w, h, "figure")
                             r_text, r_conf, r_status, r_lines = ocr_region(pil_emb, bbox, config)
+                            if r_text.strip() and is_duplicate_region_text(r_text, native_text):
+                                continue
                             emb_regs.append({
                                 "sub_idx": img_idx + 1,
                                 "text": r_text,

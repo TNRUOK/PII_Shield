@@ -1,0 +1,145 @@
+{
+  "entity_metrics": {
+    "ACCOUNT_NUMBER": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6667
+    },
+    "ADDRESS": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 2,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6667
+    },
+    "DATE_OF_BIRTH": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "DIRECTOR_ID": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "EMAIL": {
+      "tp": 14,
+      "fp": 13,
+      "fn": 6,
+      "precision": 0.5185,
+      "recall": 0.7,
+      "f1": 0.5957
+    },
+    "EMPLOYEE_ID": {
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PAN": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PASSPORT": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "PERSON": {
+      "tp": 26,
+      "fp": 44,
+      "fn": 4,
+      "precision": 0.3714,
+      "recall": 0.8667,
+      "f1": 0.52
+    },
+    "PESEL": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "PHONE": {
+      "tp": 23,
+      "fp": 2,
+      "fn": 1,
+      "precision": 0.92,
+      "recall": 0.9583,
+      "f1": 0.9388
+    },
+    "SSN": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "SUSPECT_OCR": {
+      "tp": 0,
+      "fp": 2,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "VENDOR_ID": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "OVERALL": {
+      "tp": 84,
+      "fp": 61,
+      "fn": 17,
+      "precision": 0.5793,
+      "recall": 0.8317,
+      "f1": 0.6829
+    }
+  },
+  "structure_retention": {},
+  "throughput": [
+    {
+      "file": "org_pack.pptx",
+      "seconds": 14.946598700247705,
+      "pages": 2,
+      "ppm": 8.02858244919704
+    },
+    {
+      "file": "scanned_policy.pdf",
+      "seconds": 30.36262180004269,
+      "pages": 3,
+      "ppm": 5.928341800830485
+    },
+    {
+      "file": "training_guide.docx",
+      "seconds": 9.104040999896824,
+      "pages": 1,
+      "ppm": 6.5904799858304655
+    }
+  ]
+}

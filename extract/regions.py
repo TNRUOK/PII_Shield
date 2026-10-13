@@ -55,46 +55,69 @@ def detect_candidate_regions(
 
     candidates: List[Tuple[int, int, int, int, str]] = []
 
-    # 1. Structural / Table detection (morphological horizontal & vertical lines)
+    # 1. Dark panels / inverted screenshots (dark theme admin console, colored boxes)
+    try:
+        dark_mask = (gray < 160).astype(np.uint8) * 255
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
+        closed = cv2.morphologyEx(dark_mask, cv2.MORPH_CLOSE, kernel)
+        contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in contours:
+            x, y, w, h = cv2.boundingRect(c)
+            area = w * h
+            if w >= min_w and h >= min_h and area < 0.90 * total_area:
+                crop = gray[y:y+h, x:x+w]
+                if np.mean(crop) < 150:
+                    candidates.append((x, y, w, h, "figure"))
+    except Exception as exc:
+        log.debug("Dark panel detection failed: %s", exc)
+
+    # 2. Structural / Table detection (morphological horizontal & vertical lines)
     try:
         _, bin_inv = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        # Horizontal lines kernel
-        h_size = max(img_w // 40, 15)
+        h_size = max(img_w // 30, 25)
         h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (h_size, 1))
         h_lines = cv2.morphologyEx(bin_inv, cv2.MORPH_OPEN, h_kernel)
 
-        # Vertical lines kernel
-        v_size = max(img_h // 40, 15)
+        v_size = max(img_h // 30, 25)
         v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, v_size))
         v_lines = cv2.morphologyEx(bin_inv, cv2.MORPH_OPEN, v_kernel)
 
-        table_mask = cv2.add(h_lines, v_lines)
-        table_contours, _ = cv2.findContours(table_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for c in table_contours:
-            x, y, w, h = cv2.boundingRect(c)
-            if w >= min_w and h >= min_h and (w * h) < 0.92 * total_area:
-                candidates.append((x, y, w, h, "table"))
+        grid = cv2.bitwise_and(h_lines, v_lines)
+        if cv2.countNonZero(grid) > 4:
+            table_mask = cv2.add(h_lines, v_lines)
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+            table_mask = cv2.morphologyEx(table_mask, cv2.MORPH_CLOSE, kernel)
+            table_contours, _ = cv2.findContours(table_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for c in table_contours:
+                x, y, w, h = cv2.boundingRect(c)
+                if w >= min_w and h >= min_h and (w * h) < 0.90 * total_area:
+                    candidates.append((x, y, w, h, "table"))
     except Exception as exc:
         log.debug("Table morphology detection failed: %s", exc)
 
-    # 2. Dense diagrams / figures / stamps (gradient / edge density)
+    # 3. Dense diagrams / figures / stamps (non-white background or high edge density)
     try:
         edges = cv2.Canny(gray, 50, 150)
-        # Dilate edges to connect diagram elements / text clusters
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
         dilated = cv2.dilate(edges, kernel, iterations=2)
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         for c in contours:
             x, y, w, h = cv2.boundingRect(c)
             area = w * h
-            if w >= min_w and h >= min_h and area < 0.90 * total_area:
-                # Stamp heuristic: roughly square or circular aspect ratio with non-trivial area
-                aspect = float(w) / max(h, 1)
-                if 0.7 <= aspect <= 1.4 and (area < 0.20 * total_area) and (area > 15000):
-                    candidates.append((x, y, w, h, "stamp"))
-                else:
-                    candidates.append((x, y, w, h, "figure"))
+            if w >= min_w and h >= min_h and area < 0.85 * total_area:
+                crop = gray[y:y+h, x:x+w]
+                crop_edges = edges[y:y+h, x:x+w]
+                edge_density = cv2.countNonZero(crop_edges) / float(area)
+                mean_lum = float(np.mean(crop))
+                # Text paragraphs have mean_lum > 190 and edge_density < 0.08
+                # Real figures/stamps/badges have non-white background or high edge density
+                if mean_lum < 160 or (edge_density > 0.15 and 0.6 <= (float(w)/max(h,1)) <= 1.6):
+                    aspect = float(w) / max(h, 1)
+                    if 0.7 <= aspect <= 1.4 and (area < 0.20 * total_area):
+                        candidates.append((x, y, w, h, "stamp"))
+                    else:
+                        candidates.append((x, y, w, h, "figure"))
     except Exception as exc:
         log.debug("Edge/diagram detection failed: %s", exc)
 
@@ -325,34 +348,32 @@ def ocr_region(
     return final_text, final_conf, image_status, best.line_confidences
 
 
-def is_duplicate_region_text(region_text: str, page_text: str, threshold: float = 0.90) -> bool:
+def is_duplicate_region_text(region_text: str, page_text: str, threshold: float = 0.50) -> bool:
     """
     Check if region text is already substantially represented in the page-level OCR text.
     Prevents creating redundant duplicate chunks for text already cleanly read.
     """
-    clean_reg = " ".join(region_text.split())
-    clean_page = " ".join(page_text.split())
+    clean_reg = " ".join(region_text.split()).strip().lower()
+    clean_page = " ".join(page_text.split()).strip().lower()
 
     if not clean_reg:
         return True
 
-    # Direct substring match
+    # 1. Direct substring match
     if clean_reg in clean_page:
         return True
 
-    # Token overlap ratio
-    reg_words = set(clean_reg.split())
-    page_words = set(clean_page.split())
-    if not reg_words:
-        return True
+    # 2. Check informative tokens (tokens >= 4 chars or containing digits like IDs, phones)
+    reg_tokens = [w for w in clean_reg.split() if len(w) >= 4 or any(c.isdigit() for c in w)]
+    if reg_tokens:
+        page_token_set = set(clean_page.split())
+        overlap = sum(1 for t in reg_tokens if t in page_token_set or t in clean_page)
+        if (overlap / len(reg_tokens)) >= threshold:
+            return True
 
-    overlap = len(reg_words & page_words) / float(len(reg_words))
-    if overlap >= threshold:
-        return True
-
-    # Sequence matcher on normalized strings
+    # 3. Sequence matcher on normalized strings
     ratio = difflib.SequenceMatcher(None, clean_reg, clean_page).quick_ratio()
-    return ratio >= threshold
+    return ratio >= 0.80
 
 
 def blank_regions(

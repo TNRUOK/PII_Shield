@@ -112,7 +112,9 @@ _NAME_STOP_WORDS = {
     "member", "members", "reviewer", "assignee", "respondent", "custodian",
     "delegate", "stakeholder", "participant", "operator", "signoff", "manager",
     "lead", "attendee", "company", "services", "financial", "technologies",
-    "solutions", "limited", "corp", "inc", "ltd"
+    "solutions", "limited", "corp", "inc", "ltd", "officer", "director",
+    "executive", "vp", "chief", "engineering", "head", "president",
+    "specialist", "coordinator", "administrator", "cfo", "ceo", "cto"
 }
 
 

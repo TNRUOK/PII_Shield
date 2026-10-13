@@ -252,11 +252,6 @@ def build_ui() -> gr.Blocks:
     tess_status = "✅ Installed" if is_tesseract_available() else "⚠️ Not Installed"
     with gr.Blocks(
         title="PII Shield — Local Privacy Pipeline",
-        theme=gr.themes.Soft(),
-        css="""
-        .gr-box { border-radius: 8px; }
-        h1 { color: #1a237e; }
-        """,
     ) as demo:
         gr.Markdown(
             f"# 🛡️ PII Shield\n"
@@ -286,7 +281,6 @@ def build_ui() -> gr.Blocks:
                 extracted_out = gr.Textbox(
                     label="Extracted text with location labels",
                     lines=25, max_lines=50,
-                    show_copy_button=True,
                 )
 
             with gr.Tab("🔍 Detected PII"):
@@ -348,5 +342,10 @@ if __name__ == "__main__":
         server_port=7860,
         share=False,
         show_error=True,
+        theme=gr.themes.Soft(),
+        css="""
+        .gr-box { border-radius: 8px; }
+        h1 { color: #1a237e; }
+        """,
     )
 
