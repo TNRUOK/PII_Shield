@@ -10,16 +10,6 @@
 let activeSessionId = null;
 let lastFocusedInput = null;
 
-const SUPPORTED_DOC_EXTS = [
-  ".pdf",
-  ".docx",
-  ".pptx",
-  ".doc",
-  ".ppt",
-  ".txt",
-  ".csv",
-];
-
 // Retrieve stored session ID if available
 chrome.storage.local.get(["sessionId"], (res) => {
   if (res.sessionId) activeSessionId = res.sessionId;
@@ -63,11 +53,10 @@ function showToast(msg, isSuccess = true) {
   }, 4500);
 }
 
-// Check if a file is a document that should be sanitized locally
+// Intercept all files uploaded to LLMs (PDF, DOCX, XLSX, Code, Data, Images, Text, etc.)
 function isSupportedDoc(filename) {
-  if (!filename) return false;
-  const lower = filename.toLowerCase();
-  return SUPPORTED_DOC_EXTS.some((ext) => lower.endsWith(ext));
+  // Always intercept ANY uploaded file to protect user from cloud PII leakage
+  return Boolean(filename && filename.trim().length > 0);
 }
 
 function fileToBase64(file) {
@@ -370,7 +359,7 @@ function injectFloatingWidget() {
   const filePicker = document.createElement("input");
   filePicker.type = "file";
   filePicker.id = "pii-shield-file-picker";
-  filePicker.accept = ".pdf,.docx,.pptx,.png,.jpg,.jpeg,.txt,.csv";
+  filePicker.accept = "*/*";
   filePicker.style.display = "none";
   filePicker.addEventListener("change", (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -396,7 +385,7 @@ function injectFloatingWidget() {
   docBtn.id = "pii-shield-doc-btn";
   docBtn.className = "pii-widget-btn secondary";
   docBtn.type = "button";
-  docBtn.title = "Upload PDF/DOCX/PPTX to sanitize locally with zero cloud leak";
+  docBtn.title = "Upload any document, code, data, or image file to sanitize locally with zero cloud leak";
   docBtn.innerHTML = `<span>📄</span> <span>Shield Doc</span>`;
   docBtn.addEventListener("click", (e) => {
     e.preventDefault();

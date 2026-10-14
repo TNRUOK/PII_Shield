@@ -23,53 +23,80 @@ log = logging.getLogger(__name__)
 # Magic byte signatures: (offset, bytes) → format name
 _MAGIC: List[Tuple[int, bytes, str]] = [
     (0, b"%PDF",                 "pdf"),
-    (0, b"PK\x03\x04",          "zip"),  # DOCX/PPTX are ZIP-based
+    (0, b"PK\x03\x04",          "zip"),   # DOCX/PPTX/XLSX are ZIP-based
     (0, b"\x89PNG\r\n\x1a\n",   "png"),
     (0, b"\xff\xd8\xff",        "jpeg"),
     (0, b"II\x2a\x00",          "tiff"),  # little-endian TIFF
     (0, b"MM\x00\x2a",          "tiff"),  # big-endian TIFF
     (0, b"BM",                  "bmp"),
+    (0, b"GIF87a",              "image"),
+    (0, b"GIF89a",              "image"),
+    (0, b"RIFF",                "riff"),  # WebP begins with RIFF....WEBP
 ]
+
+# Extensions recognized as plain text, source code, tabular, config, or markup
+_TEXT_EXTENSIONS = {
+    ".txt", ".csv", ".tsv", ".json", ".xml", ".html", ".htm",
+    ".md", ".markdown", ".rst",
+    ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".c", ".cpp", ".h", ".hpp",
+    ".cs", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".scala",
+    ".sql", ".sh", ".bash", ".bat", ".ps1", ".cmd",
+    ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env", ".log",
+    ".properties", ".rtf", ".tex", ".diff", ".patch",
+}
 
 
 def _detect_format(path: Path) -> str:
     """
-    Read the first 8 bytes and try magic-byte matching.
-    Returns a canonical format string: "pdf", "docx", "pptx", "image", "unknown".
+    Read the first 12 bytes and try magic-byte matching.
+    Returns a canonical format string: "pdf", "docx", "pptx", "xlsx", "image", "text", "unknown".
     """
     try:
         with open(path, "rb") as fh:
-            header = fh.read(8)
+            header = fh.read(12)
     except Exception:
         return "unknown"
 
+    ext = path.suffix.lower()
+
     for offset, magic, fmt in _MAGIC:
-        if header[offset: offset + len(magic)] == magic:
+        if header[offset : offset + len(magic)] == magic:
             if fmt == "zip":
-                # Distinguish DOCX from PPTX by extension (both are ZIP)
-                ext = path.suffix.lower()
                 if ext == ".docx":
                     return "docx"
                 if ext in (".pptx", ".ppt"):
                     return "pptx"
-                return "zip"  # unsupported ZIP variant
-            if fmt in ("png", "jpeg", "tiff", "bmp"):
+                if ext in (".xlsx", ".xlsm", ".xltx"):
+                    return "xlsx"
+                return "zip"
+            if fmt == "riff":
+                if header[8:12] == b"WEBP" or ext == ".webp":
+                    return "image"
+                return "unknown"
+            if fmt in ("png", "jpeg", "tiff", "bmp", "image"):
                 return "image"
             return fmt
 
-    # Fall back to extension
-    ext = path.suffix.lower()
-    return {
-        ".pdf": "pdf",
-        ".docx": "docx",
-        ".pptx": "pptx",
-        ".png": "image",
-        ".jpg": "image",
-        ".jpeg": "image",
-        ".tiff": "image",
-        ".tif": "image",
-        ".bmp": "image",
-    }.get(ext, "unknown")
+    # Known extensions
+    if ext in (".pdf",):
+        return "pdf"
+    if ext in (".docx", ".doc"):
+        return "docx"
+    if ext in (".pptx", ".ppt"):
+        return "pptx"
+    if ext in (".xlsx", ".xls"):
+        return "xlsx"
+    if ext in (".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp", ".gif"):
+        return "image"
+    if ext in _TEXT_EXTENSIONS:
+        return "text"
+
+    # Universal heuristic: if not binary, treat as text
+    from extract.text import is_binary_string
+    if not is_binary_string(header):
+        return "text"
+
+    return "unknown"
 
 
 def _blocked(file_path: str, reason: str) -> List[Chunk]:
@@ -118,6 +145,14 @@ def route(file_path: str, config: dict) -> List[Chunk]:
         from extract.pptx import extract_pptx
         return extract_pptx(file_path, config)
 
+    elif fmt == "xlsx":
+        from extract.text import extract_spreadsheet
+        return extract_spreadsheet(file_path, config)
+
+    elif fmt == "text":
+        from extract.text import extract_plain_text
+        return extract_plain_text(file_path, config)
+
     elif fmt == "image":
         # Single image file: OCR directly
         from PIL import Image
@@ -157,5 +192,15 @@ def route(file_path: str, config: dict) -> List[Chunk]:
             return _blocked(file_path, f"Cannot open image: {exc}")
 
     else:
+        # Final fallback: attempt plain text extraction if not binary
+        from extract.text import is_binary_string, extract_plain_text
+        try:
+            sample = path.read_bytes()[:8192]
+            if not is_binary_string(sample):
+                log.info("Treating unrecognized format %s as plain text", path.name)
+                return extract_plain_text(file_path, config)
+        except Exception:
+            pass
+
         log.warning("Unsupported format for %s (detected: %s)", path.name, fmt)
         return _blocked(file_path, f"Unsupported file format: {fmt or path.suffix}")
