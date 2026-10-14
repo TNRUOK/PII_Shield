@@ -1,5 +1,53 @@
 # CHANGELOG
 
+## [1.6.0] — 2026-10-14 (Customer Dataset Leak Remediation & Fail-Closed Residue Verification)
+
+### Summary
+Comprehensive remediation of customer record PII leaks, form-label over-redactions, and verifier safety gaps on native PDF datasets (`pii_test_dataset.pdf`):
+1. **Heading-Based Person Name Detection (`detect/context.py`, Strategy 5)**:
+   - Added rule detecting `<ID-like token> - <Capitalised Name>` heading patterns (e.g. `CUST-1001 - Aarav Sharma`), ensuring names are consistently captured even when NER misses them.
+   - Enforced single-line token matching (`[^\S\r\n]+`) to prevent headings from spanning across newlines into subsequent field labels.
+2. **Form-Label False-Positive Prevention (`detect/ner.py`, `detect/context.py`)**:
+   - Introduced `_FORM_LABEL_DENYLIST` and `_FORM_LABEL_WORDS` to `plausible_person()` and Strategy 4 anchor veto, preventing labels ("Card Number", "Card Type", "Bank Account No.", "Passport No.") from being mis-tagged as PERSON.
+   - Added `value_group: 1` to `ACCOUNT_NUMBER` and `PASSPORT` labelled rules so only the identifier values are replaced, preserving labels.
+3. **Street Address Detection & Priority (`detect/rules.py`, `detect/merge.py`)**:
+   - Expanded street suffixes to include `Main Rd`, `Main Road`, `Marg`, `Salai`, `Path`, etc.
+   - Added standalone street address rule (`number + name words + street suffix`) not requiring US state/ZIP suffixes, and a dedicated labelled address rule for values on subsequent lines.
+   - Enforced in `detect/merge.py` that `ADDRESS` entities take priority over overlapping `PERSON` spans.
+4. **Amex Card Detection & Fail-Closed Fallback (`detect/rules.py`)**:
+   - Added 15-digit Amex pattern (prefix 34/37, 4-6-5 grouping or contiguous) with Luhn checksum validation.
+   - Added fail-closed labelled fallback under `Card Number` labels redacting 13–19 digit values even if Luhn validation fails.
+5. **Routing Number & IFSC Entities (`detect/rules.py`, `detect/validators.py`)**:
+   - Added `ROUTING_NUMBER` entity with 9-digit ABA 3-7-1 weighted checksum and labelled fallback.
+   - Added `IFSC` entity (`^[A-Z]{4}0[A-Z0-9]{6}$`) with strict full-token matching.
+   - Added `(?<![A-Z0-9])` negative lookbehind to `PASSPORT` to stop partial matching inside IFSC codes.
+6. **Line-Wrapped Email Handling (`extract/pdf.py`, `detect/rules.py`)**:
+   - Added `_rejoin_wrapped_emails` in `extract/pdf.py` to re-stitch layout-wrapped emails in native text.
+   - Updated `EMAIL` rule regex to match across whitespace/newline breaks before or after `@` and `.`.
+7. **CVV, Card Expiry, & Financial Attributes (`detect/rules.py`, `config.yaml`)**:
+   - Added labelled rules for `CVV` (3-4 digits) and `CARD_EXPIRY` (MM/YY or MM/YYYY).
+   - Added `FINANCIAL` entity for Annual Income, Monthly Expenses, and Credit Score governed by `redact_financial_attributes: true` in `config.yaml`.
+8. **Verifier Fail-Closed Residue Safety Gate (`verify/leakage.py`)**:
+   - Activated scanning for `_RESIDUE_CAP_NGRAMS_RE` with business and document exclusions.
+   - Configured `check_leakage` to fail closed (`downstream_safe = False`) if unverified critical residue (`LONG_DIGITS_RESIDUE` or `CAP_NGRAMS_RESIDUE`) is detected.
+
+### Leakage Resolution on `pii_test_dataset.pdf`
+- **Person Names**: 9 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **Street Addresses**: 16 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **Cards (including Amex)**: 4 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **Routing Numbers & IFSC**: 12 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **Emails (including split)**: 1 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **CVV & Card Expiry**: 20 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **Financial Attributes**: 20 leaked $\rightarrow$ **0 leaked (100% redacted)**
+- **Form Labels**: 20 mis-redacted records $\rightarrow$ **0 mis-redacted (100% labels preserved)**
+- **Verifier Status**: `downstream_safe: True`, `confirmed_leaks: 0`
+
+### Limitations & Observations
+- City, State, ZIP/PIN, and Gender are left in the clear as instructed, acting as potential quasi-identifiers that may require k-anonymity considerations depending on downstream LLM use cases.
+- Config mismatch detected: `CHANGELOG.md` notes state `alias_propagation` and `ocr_suspect_redaction` ship as `false` by default, whereas `config.yaml` has them set to `true`.
+
+---
+
 ## [1.5.0] — 2026-10-11 (Phase 5 Corrective Remediation & No-Regression Enforcement)
 
 ### Summary

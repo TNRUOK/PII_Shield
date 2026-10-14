@@ -35,6 +35,11 @@ enabled_entities:
   - DIRECTOR_ID
   - VENDOR_ID
   - PESEL
+  - ROUTING_NUMBER
+  - IFSC
+  - CVV
+  - CARD_EXPIRY
+  - FINANCIAL
   # - LOCATION   # off by default — high false-positive rate on city/company names
 
 # Denylist for PERSON entities in NER (reject corporate/product/generic terms)
@@ -121,9 +126,12 @@ alias_source_stoplist:
   - Quality
 
 sensitivity_map:
-  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR, ADDRESS, DATE_OF_BIRTH, PESEL]
-  Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, PERSON, DIRECTOR_ID, VENDOR_ID]
+  High:   [SSN, CREDIT_CARD, AADHAAR, PASSPORT, ACCOUNT_NUMBER, IBAN, SUSPECT_OCR, ADDRESS, DATE_OF_BIRTH, PESEL, ROUTING_NUMBER, IFSC, CVV, CARD_EXPIRY]
+  Medium: [EMAIL, PHONE, EMPLOYEE_ID, PAN, PERSON, DIRECTOR_ID, VENDOR_ID, FINANCIAL]
   Low:    [IP_ADDRESS, GOVERNMENT_ID]
+
+# Redact financial attributes (Annual Income, Monthly Expenses, Credit Score)
+redact_financial_attributes: true
 
 # Test and training SSN ranges (permits 900-999 area numbers in labeled/test context)
 ssn_accept_test_ranges: true

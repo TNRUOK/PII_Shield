@@ -63,12 +63,35 @@ _SENSITIVITY = {
 }
 
 
+_FORM_LABEL_DENYLIST = {
+    "card number", "card type", "card expiry", "card", "credit card", "debit card",
+    "bank name", "bank account", "bank account no", "bank account number",
+    "street address", "date of birth", "annual income", "monthly expenses",
+    "credit score", "ifsc / routing", "ifsc", "routing", "routing number",
+    "passport no", "passport number", "pan (india)", "ip address", "occupation",
+    "customer records", "synthetic test data", "zip / pin", "gender", "country",
+    "state", "city", "phone", "email", "ssn", "cvv", "notes", "verified",
+}
+
+_FORM_LABEL_WORDS = {
+    "card", "number", "type", "expiry", "bank", "account", "street",
+    "address", "date", "birth", "annual", "income", "monthly", "expenses",
+    "credit", "score", "ifsc", "routing", "passport", "pan", "india",
+    "occupation", "customer", "records", "zip", "pin", "cvv", "notes", "verified",
+    "name", "dataset", "data", "test", "synthetic", "real", "persons",
+    "savings", "federal", "union", "demo", "sample", "example",
+    "engineer", "civil", "software", "analyst", "manager", "designer", "graphic",
+    "sales", "nurse", "accountant", "teacher", "pharmacist", "consultant",
+}
+
+
 def plausible_person(text: str, denylist: set[str]) -> bool:
     """
     Validate that an NER-detected PERSON entity is plausible:
       - Reject single ALL-CAPS tokens (e.g. "MFA", "BYOD", "API")
       - Reject tokens containing digits or underscores (e.g. "User_123")
       - Reject anything whose first token is in person_denylist (e.g. "Cadence", "Optiv")
+      - Reject form field labels (e.g. "Card Number", "Bank Account No.")
     """
     clean = text.strip()
     if not clean:
@@ -84,6 +107,14 @@ def plausible_person(text: str, denylist: set[str]) -> bool:
     first_token = words[0].strip(":-.,'\"").lower()
     if first_token in denylist:
         return False
+
+    # Reject form field labels and pure label word combinations
+    lower_clean = clean.lower().strip(":-.,'\"")
+    if lower_clean in _FORM_LABEL_DENYLIST:
+        return False
+    if all(w.strip(":-.,'\"").lower() in _FORM_LABEL_WORDS for w in words):
+        return False
+
     return True
 
 

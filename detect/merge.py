@@ -125,8 +125,12 @@ def merge_hits(
                     method=combined_method,
                 )
             else:
-                # Different type — always union spans, keep higher-confidence type
-                if hit.confidence >= current.confidence:
+                # Different type — ADDRESS wins over PERSON when spans overlap
+                if current.entity_type == "ADDRESS" and hit.entity_type == "PERSON":
+                    winner = current
+                elif hit.entity_type == "ADDRESS" and current.entity_type == "PERSON":
+                    winner = hit
+                elif hit.confidence >= current.confidence:
                     winner = hit
                 else:
                     winner = current

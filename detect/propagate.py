@@ -93,24 +93,31 @@ def _derive_email_surnames(email: str, veto_words: Set[str]) -> List[Tuple[str, 
     local = email.split("@")[0].strip()
     results = []
 
-    # Case 1: Dot / underscore / hyphen separated (m.achebe, t.lindqvist, p.raghavan)
+    # Case 1: Dot / underscore / hyphen separated (m.achebe, t.lindqvist, p.raghavan, a.sharma72)
     parts = [p for p in re.split(r"[._\-]", local) if p]
     if len(parts) >= 2:
-        surname_raw = parts[-1]
-        first_raw = parts[0]
+        surname_raw = re.sub(r"\d+$", "", parts[-1])
+        first_raw = re.sub(r"\d+$", "", parts[0])
         if len(surname_raw) >= _MIN_ALIAS_LEN and surname_raw.lower() not in veto_words:
             surname = surname_raw.capitalize()
-            initial = first_raw[0].upper() + "."
-            init_surname = f"{initial} {surname}"
+            initial = first_raw[0].upper() + "." if first_raw else ""
+            init_surname = f"{initial} {surname}".strip()
             results.append((surname, init_surname, init_surname))
-    elif len(local) >= 5 and local.isalpha():
+        if (len(first_raw) >= _MIN_ALIAS_LEN and
+                first_raw.lower() not in veto_words and
+                first_raw.lower() not in _COMMON_WORD_STOPLIST):
+            first_name = first_raw.capitalize()
+            results.append((first_name, first_name, first_name))
+    elif len(local) >= 5:
         # Case 2: Concatenated 1-letter prefix + surname (e.g. mvance -> Vance, erostova -> Rostova)
-        init = local[0].upper() + "."
-        surname_raw = local[1:]
-        if len(surname_raw) >= _MIN_ALIAS_LEN and surname_raw.lower() not in veto_words:
-            surname = surname_raw.capitalize()
-            init_surname = f"{init} {surname}"
-            results.append((surname, init_surname, init_surname))
+        clean_local = re.sub(r"\d+$", "", local)
+        if len(clean_local) >= 5 and clean_local.isalpha():
+            init = clean_local[0].upper() + "."
+            surname_raw = clean_local[1:]
+            if len(surname_raw) >= _MIN_ALIAS_LEN and surname_raw.lower() not in veto_words:
+                surname = surname_raw.capitalize()
+                init_surname = f"{init} {surname}"
+                results.append((surname, init_surname, init_surname))
 
     return results
 

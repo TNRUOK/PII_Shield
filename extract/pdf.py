@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -179,9 +180,24 @@ def extract_pdf(file_path: str, config: dict) -> List[Chunk]:
     pages_to_ocr: List[int] = []
     cached_ocr_results: Dict[int, tuple] = {}
 
+    def _rejoin_wrapped_emails(text: str) -> str:
+        """Rejoin email addresses split across line breaks by PDF layout wrapping."""
+        text = re.sub(
+            r"(<?[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.)[\r\n]+([a-zA-Z]{2,10}>?)",
+            r"\1\2",
+            text,
+        )
+        text = re.sub(
+            r"(<?[a-zA-Z0-9._%+\-]+@)[\r\n]+([a-zA-Z0-9.\-]+\.[a-zA-Z]{2,10}>?)",
+            r"\1\2",
+            text,
+        )
+        return text
+
+
     for page_num in range(len(doc)):
         page = doc[page_num]
-        native_text = page.get_text("text").strip()
+        native_text = _rejoin_wrapped_emails(page.get_text("text").strip())
         if len(native_text) >= min_chars:
             native_pages[page_num] = native_text
             # Extract embedded images on native pages for region OCR

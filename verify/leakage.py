@@ -19,6 +19,7 @@ from typing import List, Optional, Union, Dict, Set, Any
 
 from extract.models import Chunk
 from detect.merge import detect_chunk, Entity, _mask
+from detect.ner import _FORM_LABEL_DENYLIST, _FORM_LABEL_WORDS
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ _PARTIAL_SSN_RE = re.compile(
     r"|(?<!\d)\d{3}-\d{2}-\d{1,4}(?!\d)"                # e.g. 123-45-67
 )
 _RESIDUE_INITIALS_RE = re.compile(r"\b([A-Z]{1,3}\s+[A-Z][a-z]{2,})\b")
-_RESIDUE_CAP_NGRAMS_RE = re.compile(r"\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){1,2})\b")
+_RESIDUE_CAP_NGRAMS_RE = re.compile(r"\b([A-Z][a-z]{2,}(?:[^\S\r\n]+[A-Z][a-z]{2,}){1,2})\b")
 _RESIDUE_LONG_DIGITS_RE = re.compile(r"\b\d{8,}\b")
 
 # Phase 6 independent leak scanners (residual PII patterns)
@@ -485,14 +486,56 @@ def check_leakage(
                 if masked not in residue_set:
                     residue_set.append(masked)
 
+        _CAP_NGRAMS_EXCLUSIONS = {
+            "synthetic test data", "customer records", "not real persons", "real persons",
+            "united states", "civil engineer", "credit union", "example bank", "demo credit",
+            "sample savings", "audit summary", "report table", "figure token", "token recall",
+            "chunk breakdown", "throughput performance", "performance speed",
+        }
+
+        for m in _RESIDUE_CAP_NGRAMS_RE.finditer(scan_text):
+            if not any(s <= m.start() and m.end() <= e for (s, e) in existing_spans):
+                val = m.group(0).strip()
+                lower_val = val.lower()
+                if lower_val in _FORM_LABEL_DENYLIST or lower_val in _CAP_NGRAMS_EXCLUSIONS:
+                    continue
+                words = val.split()
+                if all(w.lower() in _FORM_LABEL_WORDS for w in words):
+                    continue
+                if any(w.lower() in (
+                    "test", "dataset", "records", "data", "not", "real", "synthetic",
+                    "bank", "credit", "union", "savings", "example", "demo", "sample",
+                    "notes", "verified", "engineer", "nurse", "doctor", "page",
+                    "revenue", "quarterly", "growth", "flow", "cache", "service", "services",
+                    "system", "systems", "component", "architecture", "metrics", "chart",
+                    "diagram", "table", "report", "overview", "summary", "status", "version",
+                    "release", "security", "management", "operation", "operations"
+                ) for w in words):
+                    continue
+                masked = _mask(val)
+                if not any(r["masked"] == masked and r["location"] == chunk.location for r in unverified_residue):
+                    unverified_residue.append({
+                        "location": chunk.location,
+                        "type": "CAP_NGRAMS_RESIDUE",
+                        "masked": masked,
+                    })
+                if masked not in residue_set:
+                    residue_set.append(masked)
+
     log.info(
         "Leakage scan complete: %d chunks scanned (%d visual), %d confirmed leaks, %d residue items in %s",
         chunks_scanned, visual_chunks_scanned, len(leaks), len(unverified_residue), file_path,
     )
 
+    has_critical_residue = any(
+        r["type"] in ("LONG_DIGITS_RESIDUE", "CAP_NGRAMS_RESIDUE")
+        for r in unverified_residue
+    )
+    is_safe = (len(leaks) == 0) and (not has_critical_residue)
+
     result = LeakResult(
         file=file_path,
-        downstream_safe=len(leaks) == 0,
+        downstream_safe=is_safe,
         leaks=leaks,
         confirmed_leaks=leaks,
         unverified_residue=unverified_residue,

@@ -217,3 +217,38 @@ def ipv4_check(ip: str) -> bool:
         return all(0 <= int(p) <= 255 for p in parts if p)
     except ValueError:
         return False
+
+
+# ---------------------------------------------------------------------------
+# ABA Routing Transit Number check (3-7-1 weights)
+# ---------------------------------------------------------------------------
+
+def aba_routing_check(routing: str) -> bool:
+    """
+    Validate a 9-digit US ABA routing transit number using the 3-7-1 weighting algorithm.
+    Weights: (3, 7, 1, 3, 7, 1, 3, 7, 1)
+    """
+    digits = re.sub(r"\D", "", routing)
+    if len(digits) != 9:
+        return False
+    d = [int(ch) for ch in digits]
+    weights = [3, 7, 1, 3, 7, 1, 3, 7, 1]
+    checksum = sum(w * digit for w, digit in zip(weights, d))
+    return checksum % 10 == 0
+
+
+# ---------------------------------------------------------------------------
+# Indian Financial System Code (IFSC) check
+# ---------------------------------------------------------------------------
+
+def ifsc_check(code: str) -> bool:
+    """
+    Validate an Indian Financial System Code (IFSC).
+    Format: 4 alphabetic characters representing the bank,
+            followed by a single '0' reserved for future use,
+            followed by 6 alphanumeric characters representing the branch.
+            Total length: 11 characters.
+    """
+    clean = code.strip().upper()
+    return bool(re.match(r"^[A-Z]{4}0[A-Z0-9]{6}$", clean))
+

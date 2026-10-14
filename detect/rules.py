@@ -26,7 +26,7 @@ from typing import List, Optional, Callable
 
 from detect.validators import (
     luhn_check, verhoeff_check, iban_check, ssn_sanity, ipv4_check,
-    phone_validate, pesel_check
+    phone_validate, pesel_check, aba_routing_check, ifsc_check
 )
 
 log = logging.getLogger(__name__)
@@ -74,8 +74,9 @@ def _is_phone_exclusion(token: str) -> bool:
 
 # Street suffixes for Address rule
 _STREET_SUFFIX = (
-    r"(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|"
-    r"Crescent|Cres\.?|Boulevard|Blvd\.?|Way|Place|Pl\.?|Square|Sq\.?|Terrace|Ter\.?)"
+    r"(?:Main\s+Rd\.?|Main\s+Road|Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|"
+    r"Crescent|Cres\.?|Boulevard|Blvd\.?|Way|Place|Pl\.?|Square|Sq\.?|Terrace|Ter\.?|"
+    r"Marg|Salai|Path)"
 )
 
 # Known TLDs for email validation
@@ -86,7 +87,7 @@ RULES = [
     # --- Email ---
     {
         "pattern": _compile(
-            r"<?[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,10}(?:\.[a-zA-Z]{2,6})?>?"
+            r"<?[a-zA-Z0-9._%+\-]+(?:\s*[\r\n]\s*|\s*)?@(?:\s*[\r\n]\s*|\s*)?[a-zA-Z0-9.\-]+(?:\s*[\r\n]\s*|\s*)?\.(?:\s*[\r\n]\s*|\s*)?[a-zA-Z]{2,10}(?:\.[a-zA-Z]{2,6})?>?"
         ),
         "entity_type": "EMAIL",
         "validator": None,
@@ -228,14 +229,41 @@ RULES = [
         "sensitivity": "High",
     },
 
+    # --- Amex Credit Card: 15 digits (4-6-5 grouping or contiguous), prefix 34/37 ---
+    {
+        "pattern": _compile(
+            r"(?<!\d)(3[47]\d{2}[\s\-]?\d{6}[\s\-]?\d{5}|3[47]\d{13})(?!\d)"
+        ),
+        "entity_type": "CREDIT_CARD",
+        "value_group": 1,
+        "validator": lambda t: luhn_check(re.sub(r"[\s\-]", "", t)),
+        "confidence": 0.93,
+        "soft_penalty": 1.0,
+        "sensitivity": "High",
+    },
+
+    # --- Labelled Card Number fallback (fail-closed under Card Number label even if Luhn fails) ---
+    {
+        "pattern": _compile(
+            r"(?i:\b(?:card\s+(?:no\.?|number|#)|credit\s+card|debit\s+card)\s*[:\-]?\s*[\n\r]?\s*)([0-9][0-9\s\-]{11,22}[0-9])\b"
+        ),
+        "entity_type": "CREDIT_CARD",
+        "value_group": 1,
+        "validator": lambda t: 13 <= len(re.sub(r"\D", "", t)) <= 19,
+        "confidence": 0.90,
+        "soft_penalty": 1.0,
+        "sensitivity": "High",
+    },
+
     # --- Account Number (labelled) ---
     {
         "pattern": _compile(
-            r"(?:account\s+(?:no|number|#)|a/?c\s+no)\s*[:\-]?\s*(\d[\d\s\-]{6,20}\d)"
+            r"(?i:\b(?:bank\s+)?(?:account\s+(?:no\.?|number|#)|a/?c\s+no\.?)\s*[:\-]?\s*[\n\r]?\s*)(\d[\d\s\-]{6,20}\d)\b"
         ),
         "entity_type": "ACCOUNT_NUMBER",
+        "value_group": 1,
         "validator": None,
-        "confidence": 0.85,
+        "confidence": 0.88,
         "soft_penalty": 0.0,
         "sensitivity": "High",
     },
@@ -264,15 +292,29 @@ RULES = [
         "sensitivity": "High",
     },
 
-    # --- Passport (labelled context required OR standard format) ---
+    # --- Passport (labelled) ---
     {
         "pattern": _compile(
-            r"(?:passport(?:\s+(?:no|number|#))?\s*[:\-]?\s*)?[A-Z]{1,2}\d{6,9}\b"
+            r"(?i:\bpassport(?:\s+(?:no\.?|number|#))?\s*[:\-]?\s*[\n\r]?\s*)(?<![A-Z0-9])([A-Z]{1,2}\d{6,9})\b"
         ),
         "entity_type": "PASSPORT",
-        "validator": None,
+        "value_group": 1,
+        "validator": lambda t: not ifsc_check(t),
+        "confidence": 0.90,
+        "soft_penalty": 1.0,
+        "sensitivity": "High",
+    },
+
+    # --- Passport (standalone) ---
+    {
+        "pattern": _compile(
+            r"(?<![A-Z0-9])([A-Z]{1,2}\d{6,9})\b"
+        ),
+        "entity_type": "PASSPORT",
+        "value_group": 1,
+        "validator": lambda t: not ifsc_check(t),
         "confidence": 0.75,
-        "soft_penalty": 0.0,
+        "soft_penalty": 1.0,
         "sensitivity": "High",
     },
 
@@ -310,6 +352,19 @@ RULES = [
         "sensitivity": "High",
     },
 
+    # --- Labelled Street Address (value on its own line after 'Street Address' label) ---
+    {
+        "pattern": _compile(
+            r"(?i:\b(?:street\s+address|home\s+address|residential\s+address)\s*[:\-]?\s*[\n\r]+\s*)"
+            r"([0-9]{1,5}\s+[A-Za-z0-9\s,.\-#]+?\b" + _STREET_SUFFIX + r"\b[^\n\r]*)"
+        ),
+        "entity_type": "ADDRESS",
+        "value_group": 1,
+        "confidence": 0.90,
+        "soft_penalty": 0.0,
+        "sensitivity": "High",
+    },
+
     # --- Home Address (narrative introduction: home address, residential address, lives at) ---
     {
         "pattern": _compile(
@@ -330,6 +385,18 @@ RULES = [
             r"(?:,?\s+(?:Apartment|Apt\.?|Suite|Unit|Flat)\s+[0-9A-Za-z\-]+)?"
             r"(?:,?\s+[A-Z][a-z]+)?"
             r"(?:,?\s+(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\s+\d{5}(?:-\d{4})?))\b"
+        ),
+        "entity_type": "ADDRESS",
+        "value_group": 1,
+        "confidence": 0.85,
+        "soft_penalty": 0.0,
+        "sensitivity": "High",
+    },
+
+    # --- Standalone Street Address (number + name words + street suffix) ---
+    {
+        "pattern": _compile(
+            r"\b([0-9]{1,5}\s+(?:[A-Z0-9][a-zA-Z0-9.\-]*\s+){1,4}" + _STREET_SUFFIX + r")\b"
         ),
         "entity_type": "ADDRESS",
         "value_group": 1,
@@ -518,6 +585,119 @@ RULES = [
         "soft_penalty": 0.0,
         "sensitivity": "Medium",
     },
+
+    # --- US ABA Routing Number (9 digits, ABA checksum 3-7-1) ---
+    {
+        "pattern": _compile(
+            r"(?<!\d)([0123678]\d{8})(?!\d)"
+        ),
+        "entity_type": "ROUTING_NUMBER",
+        "value_group": 1,
+        "validator": aba_routing_check,
+        "confidence": 0.85,
+        "soft_penalty": 1.0,
+        "sensitivity": "High",
+    },
+
+    # --- Labelled Routing Number fallback (fail-closed under Routing label even if checksum fails) ---
+    {
+        "pattern": _compile(
+            r"(?i:\b(?:routing(?:\s+(?:no\.?|number|#))?|aba(?:\s+(?:no\.?|number|#))?|ifsc\s*/\s*routing)\s*[:\-]?\s*[\n\r]?\s*)(\d{9})\b"
+        ),
+        "entity_type": "ROUTING_NUMBER",
+        "value_group": 1,
+        "validator": None,
+        "confidence": 0.92,
+        "soft_penalty": 0.0,
+        "sensitivity": "High",
+    },
+
+    # --- Indian Financial System Code (IFSC) ---
+    {
+        "pattern": _compile(
+            r"(?<![A-Za-z0-9])([A-Z]{4}0[A-Z0-9]{6})(?![A-Za-z0-9])"
+        ),
+        "entity_type": "IFSC",
+        "value_group": 1,
+        "validator": ifsc_check,
+        "confidence": 0.92,
+        "soft_penalty": 1.0,
+        "sensitivity": "High",
+    },
+
+    # --- Labelled IFSC Code ---
+    {
+        "pattern": _compile(
+            r"(?i:\b(?:ifsc(?:\s+(?:code|no\.?|number))?|ifsc\s*/\s*routing)\s*[:\-]?\s*[\n\r]?\s*)(?<![A-Za-z0-9])([A-Z]{4}0[A-Z0-9]{6})\b"
+        ),
+        "entity_type": "IFSC",
+        "value_group": 1,
+        "validator": ifsc_check,
+        "confidence": 0.95,
+        "soft_penalty": 1.0,
+        "sensitivity": "High",
+    },
+
+    # --- Card CVV (labelled: 3-4 digits under CVV / CVC) ---
+    {
+        "pattern": _compile(
+            r"(?i:\b(?:cvv2?|cvc2?|security\s+code)\s*[:\-]?\s*[\n\r]?\s*)(\d{3,4})\b"
+        ),
+        "entity_type": "CVV",
+        "value_group": 1,
+        "validator": None,
+        "confidence": 0.95,
+        "soft_penalty": 0.0,
+        "sensitivity": "High",
+    },
+
+    # --- Card Expiry (labelled: MM/YY or MM/YYYY under Card Expiry) ---
+    {
+        "pattern": _compile(
+            r"(?i:\b(?:card\s+expiry|expiry(?:\s+date)?|exp(?:\.|\s+date)?|expiration(?:\s+date)?)\s*[:\-]?\s*[\n\r]?\s*)((?:0[1-9]|1[0-2])\s*[\/\-]\s*(?:\d{4}|\d{2}))\b"
+        ),
+        "entity_type": "CARD_EXPIRY",
+        "value_group": 1,
+        "validator": None,
+        "confidence": 0.92,
+        "soft_penalty": 0.0,
+        "sensitivity": "High",
+    },
+
+    # --- Financial Attributes: Annual Income, Monthly Expenses, Credit Score (labelled) ---
+    {
+        "pattern": _compile(
+            r"(?i:\bannual\s+income(?:\s*(?:[\n\r]+\s*)?\([A-Za-z]+\))?\s*[:\-]?\s*[\n\r]?\s*)([\$€£₹]?\s*[\d,]+(?:\.\d{1,2})?)\b"
+        ),
+        "entity_type": "FINANCIAL",
+        "value_group": 1,
+        "validator": None,
+        "confidence": 0.90,
+        "soft_penalty": 0.0,
+        "sensitivity": "Medium",
+    },
+    {
+        "pattern": _compile(
+            r"(?i:\bmonthly\s+expenses?(?:\s*(?:[\n\r]+\s*)?\([A-Za-z]+\))?\s*[:\-]?\s*[\n\r]?\s*)([\$€£₹]?\s*[\d,]+(?:\.\d{1,2})?)\b"
+        ),
+        "entity_type": "FINANCIAL",
+        "value_group": 1,
+        "validator": None,
+        "confidence": 0.90,
+        "soft_penalty": 0.0,
+        "sensitivity": "Medium",
+    },
+    {
+        "pattern": _compile(
+            r"(?i:\bcredit\s+score\s*[:\-]?\s*[\n\r]?\s*)(\d{3})\b"
+        ),
+        "entity_type": "FINANCIAL",
+        "value_group": 1,
+        "validator": None,
+        "confidence": 0.90,
+        "soft_penalty": 0.0,
+        "sensitivity": "Medium",
+    },
 ]
 
 
@@ -573,6 +753,8 @@ def run_rules(text: str, config: dict, is_ocr: bool = False) -> List[RawHit]:
 
         etype = rule["entity_type"]
         if etype not in enabled:
+            continue
+        if etype == "FINANCIAL" and not config.get("redact_financial_attributes", True):
             continue
 
         for m in rule["pattern"].finditer(text):

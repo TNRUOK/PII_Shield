@@ -27,6 +27,7 @@ import logging
 from typing import List, Tuple
 
 from detect.rules import RawHit
+from detect.ner import _FORM_LABEL_DENYLIST, _FORM_LABEL_WORDS
 
 log = logging.getLogger(__name__)
 
@@ -301,7 +302,7 @@ def run_context(
         "Committee", "Office", "Group", "Board", "Risk", "Privacy",
         "Security", "Compliance", "Audit", "Technology", "Operations"
     ])}
-    veto_words = denylist | stoplist | non_person | _NAME_STOP_WORDS
+    veto_words = denylist | stoplist | non_person | _NAME_STOP_WORDS | _FORM_LABEL_WORDS
 
     anchor_tail_pattern = re.compile(
         r"(?:\s*[\(\[]?\s*(?:EMP[\-_]\d{3,8}|DIR-\d{4})\)?|"
@@ -325,6 +326,8 @@ def run_context(
         if len(words) < 2:
             continue
         if any(w.strip(":-.,;'\"").lower() in veto_words for w in words):
+            continue
+        if cand_name.lower().strip(":-.,;'\"") in _FORM_LABEL_DENYLIST:
             continue
 
         s, e = m.start(1), m.end(1)
@@ -352,5 +355,35 @@ def run_context(
                     sensitivity="Medium",
                     method="anchor",
                 ))
+
+    # --- Strategy 5: Heading Shape "<ID-like token> - <Capitalised Name>" ---
+    # e.g., "CUST-1001 - Aarav Sharma"
+    heading_pattern = re.compile(
+        r"\b([A-Z]{2,10}[-_]?\d{2,8})[^\S\r\n]*[-–—:][^\S\r\n]*([A-Z][a-z]+(?:-[A-Z][a-z]+)?(?:[^\S\r\n]+[A-Z][a-z]+(?:-[A-Z][a-z]+)?){1,3})\b"
+    )
+    for m in heading_pattern.finditer(chunk_text):
+        cand_name = m.group(2).strip()
+        words = cand_name.split()
+        if len(words) < 2:
+            continue
+        if any(w.strip(":-.,;'\"").lower() in veto_words for w in words):
+            continue
+        if cand_name.lower().strip(":-.,;'\"") in _FORM_LABEL_DENYLIST:
+            continue
+        s, e = m.start(2), m.end(2)
+        covered = any(
+            h.entity_type == "PERSON" and h.start <= s and h.end >= e
+            for h in (updated + new_hits)
+        )
+        if not covered:
+            new_hits.append(RawHit(
+                entity_type="PERSON",
+                start=s,
+                end=e,
+                text=cand_name,
+                confidence=0.95,
+                sensitivity="Medium",
+                method="heading_id_name",
+            ))
 
     return new_hits, updated

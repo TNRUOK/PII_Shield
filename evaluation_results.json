@@ -1,6 +1,14 @@
 {
   "entity_metrics": {
-    "AADHAAR": {
+    "EMAIL": {
+      "tp": 6,
+      "fp": 2,
+      "fn": 2,
+      "precision": 0.75,
+      "recall": 0.75,
+      "f1": 0.75
+    },
+    "EMPLOYEE_ID": {
       "tp": 1,
       "fp": 0,
       "fn": 0,
@@ -8,61 +16,29 @@
       "recall": 1.0,
       "f1": 1.0
     },
-    "EMAIL": {
-      "tp": 18,
-      "fp": 1,
-      "fn": 2,
-      "precision": 0.9474,
-      "recall": 0.9,
-      "f1": 0.9231
-    },
-    "EMPLOYEE_ID": {
-      "tp": 6,
-      "fp": 1,
-      "fn": 1,
-      "precision": 0.8571,
-      "recall": 0.8571,
-      "f1": 0.8571
-    },
-    "GOVERNMENT_ID": {
+    "IP_ADDRESS": {
       "tp": 0,
       "fp": 1,
-      "fn": 0,
+      "fn": 1,
       "precision": 0.0,
       "recall": 0.0,
       "f1": 0.0
     },
-    "IP_ADDRESS": {
-      "tp": 1,
-      "fp": 0,
-      "fn": 0,
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1": 1.0
-    },
-    "PAN": {
-      "tp": 1,
-      "fp": 0,
-      "fn": 0,
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1": 1.0
-    },
     "PERSON": {
-      "tp": 48,
-      "fp": 4,
-      "fn": 1,
-      "precision": 0.9231,
-      "recall": 0.9796,
-      "f1": 0.9505
+      "tp": 21,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.9545,
+      "recall": 1.0,
+      "f1": 0.9767
     },
     "PHONE": {
-      "tp": 13,
+      "tp": 7,
       "fp": 0,
-      "fn": 1,
+      "fn": 0,
       "precision": 1.0,
-      "recall": 0.9286,
-      "f1": 0.963
+      "recall": 1.0,
+      "f1": 1.0
     },
     "SSN": {
       "tp": 1,
@@ -72,46 +48,38 @@
       "recall": 0.5,
       "f1": 0.6667
     },
-    "SUSPECT_OCR": {
-      "tp": 0,
-      "fp": 1,
-      "fn": 0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1": 0.0
-    },
     "OVERALL": {
-      "tp": 89,
-      "fp": 8,
-      "fn": 6,
-      "precision": 0.9175,
-      "recall": 0.9368,
-      "f1": 0.9271
+      "tp": 36,
+      "fp": 4,
+      "fn": 4,
+      "precision": 0.9,
+      "recall": 0.9,
+      "f1": 0.9
     }
   },
   "structure_retention": {
-    "org_pack.pptx": 0.8978,
-    "scanned_policy.pdf": 0.9608,
-    "training_guide.docx": 0.9887
+    "org_pack.pptx": 0.983,
+    "scanned_policy.pdf": 0.9201,
+    "training_guide.docx": 0.8929
   },
   "throughput": [
     {
       "file": "org_pack.pptx",
-      "seconds": 3.6893110000528395,
-      "pages": 8,
-      "ppm": 130.10559424053034
+      "seconds": 2.9623256996273994,
+      "pages": 2,
+      "ppm": 40.50871246706382
     },
     {
       "file": "scanned_policy.pdf",
-      "seconds": 2.5485450997948647,
-      "pages": 6,
-      "ppm": 141.25706467936425
+      "seconds": 5.344886899925768,
+      "pages": 4,
+      "ppm": 44.90272750267797
     },
     {
       "file": "training_guide.docx",
-      "seconds": 3.738395099993795,
-      "pages": 4,
-      "ppm": 64.19867177773648
+      "seconds": 0.9302028999663889,
+      "pages": 1,
+      "ppm": 64.5020564891466
     }
   ]
 }
